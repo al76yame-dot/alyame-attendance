@@ -1,0 +1,16 @@
+{
+  "name": "Alyame Travel Attendance",
+  "short_name": "Alyame Attendance",
+  "description": "نظام حضور وانصراف موظفي شركة اليامي للسفر والسياحة",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f9f9fc",
+  "theme_color": "#00355f",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    { "src": "assets/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/logo.png", "sizes": "192x192", "type": "image/png", "purpose": "any" }
+  ]
+}
