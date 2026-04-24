@@ -1,8 +1,8 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const SB_URL = 'https://fsiprpuhmrhjuyskwtcz.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzaXBycHVobXJoanV5c2t3dGN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNjM1NDIsImV4cCI6MjA5MDYzOTU0Mn0._xu47dZ1kdAbYTJdKbakphpB9is71uGBraXKGFIYWFw';
+const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
+const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang';
 
 // ============= Supabase REST client (no SDK needed) =============
