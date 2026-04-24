@@ -221,6 +221,52 @@
   </div>
 </div>
 
+<!-- Log Edit Modal -->
+<div id="log-modal" class="hidden fixed inset-0 z-[100] flex items-end lg:items-center justify-center p-0 lg:p-6 bg-black/50 backdrop-blur-sm modal-overlay">
+  <div class="bg-white w-full lg:max-w-md rounded-t-3xl lg:rounded-3xl max-h-[90vh] overflow-y-auto">
+    <div class="sticky top-0 bg-white flex justify-between items-center p-5 border-b border-outline-variant/30">
+      <h3 class="text-lg font-bold text-primary">تعديل سجل الحضور / Edit Log</h3>
+      <button type="button" onclick="document.getElementById('log-modal').classList.add('hidden')" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <form id="log-form" class="p-5 space-y-4">
+      <input type="hidden" id="lf-id"/>
+      <div>
+        <p id="lf-emp" class="text-sm text-outline mb-1">—</p>
+      </div>
+      <div>
+        <label class="text-sm font-semibold mb-1 block">وقت الحضور / Check-in</label>
+        <input id="lf-in" type="datetime-local" required class="w-full h-12 px-3 bg-white border border-outline-variant rounded-xl focus:border-primary outline-none"/>
+      </div>
+      <div>
+        <label class="text-sm font-semibold mb-1 block">وقت الانصراف / Check-out</label>
+        <input id="lf-out" type="datetime-local" class="w-full h-12 px-3 bg-white border border-outline-variant rounded-xl focus:border-primary outline-none"/>
+        <p class="text-[11px] text-outline mt-1">اتركه فارغاً إذا كان الموظف لا يزال في العمل / Leave empty if still clocked in</p>
+      </div>
+      <div>
+        <label class="text-sm font-semibold mb-1 block">موقع الحضور / Check-in location</label>
+        <input id="lf-loc-in" type="text" class="w-full h-12 px-3 bg-white border border-outline-variant rounded-xl focus:border-primary outline-none"/>
+      </div>
+      <div>
+        <label class="text-sm font-semibold mb-1 block">موقع الانصراف / Check-out location</label>
+        <input id="lf-loc-out" type="text" class="w-full h-12 px-3 bg-white border border-outline-variant rounded-xl focus:border-primary outline-none"/>
+      </div>
+      <div>
+        <label class="text-sm font-semibold mb-1 block">ملاحظة / Note</label>
+        <textarea id="lf-note" rows="2" class="w-full p-3 bg-white border border-outline-variant rounded-xl focus:border-primary outline-none"></textarea>
+      </div>
+      <div class="flex gap-2 pt-3 border-t border-outline-variant/30">
+        <button type="button" onclick="App.deleteLog()" class="h-12 px-4 bg-error-container text-error font-semibold rounded-xl">
+          <span class="material-symbols-outlined align-middle">delete</span>
+        </button>
+        <button type="button" onclick="document.getElementById('log-modal').classList.add('hidden')" class="flex-1 h-12 bg-surface-container text-on-surface font-semibold rounded-xl">إلغاء</button>
+        <button type="submit" class="flex-1 h-12 bg-primary text-white font-bold rounded-xl">حفظ</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Mobile bottom nav -->
 <nav class="desktop-hide fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-white/80 backdrop-blur-2xl border-t border-slate-200/50 rounded-t-2xl">
   <a href="dashboard.html" class="flex flex-col items-center text-slate-400">

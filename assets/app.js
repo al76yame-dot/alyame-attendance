@@ -516,6 +516,8 @@ async function initAdmin(){
   document.getElementById('emp-form').onsubmit = saveEmp;
   document.getElementById('btn-cancel-emp').onclick = closeEmpModal;
   document.getElementById('admin-export').onclick = exportAllCSV;
+  const lf = document.getElementById('log-form');
+  if (lf) lf.onsubmit = saveLog;
 
   await refreshStats();
   switchTab('employees');
@@ -659,7 +661,7 @@ function adminLogCard(l){
       </div>
       <div class="shrink-0 flex flex-col items-end gap-1">
         ${status}
-        <button onclick="App.showDetails('${l.id}')" class="text-xs text-primary font-semibold">${t('history.details')}</button>
+        <button onclick="App.editLog('${l.id}')" class="text-xs text-primary font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">edit</span>تعديل</button>
       </div>
     </div>`;
 }
@@ -684,6 +686,66 @@ async function loadLiveMap(){
   });
   if (bounds.length>1) adminMap.fitBounds(bounds,{padding:[40,40]});
   info.innerHTML = `<p class="text-sm text-on-surface-variant">${state.lang==='ar'?'إجمالي النشطين':'Total active'}: <b class="text-primary">${logs.length}</b> · ${state.lang==='ar'?'بموقع':'With GPS'}: <b class="text-primary">${valid.length}</b></p>`;
+}
+
+function toLocalInput(iso){
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function editLog(id){
+  const logs = window._adminLogs || [];
+  const l = logs.find(x => x.id === id);
+  if (!l) return;
+  const emp = l.att_employees || {};
+  document.getElementById('lf-id').value = l.id;
+  document.getElementById('lf-emp').textContent = (emp.name||'—') + (emp.role?' · '+t('role.'+emp.role):'');
+  document.getElementById('lf-in').value = toLocalInput(l.check_in);
+  document.getElementById('lf-out').value = toLocalInput(l.check_out);
+  document.getElementById('lf-loc-in').value = l.location_in || '';
+  document.getElementById('lf-loc-out').value = l.location_out || '';
+  document.getElementById('lf-note').value = l.note || '';
+  document.getElementById('log-modal').classList.remove('hidden');
+}
+
+async function saveLog(e){
+  e.preventDefault();
+  const id = document.getElementById('lf-id').value;
+  const inVal = document.getElementById('lf-in').value;
+  const outVal = document.getElementById('lf-out').value;
+  if (!inVal) { alert('وقت الحضور مطلوب'); return; }
+  const checkIn = new Date(inVal);
+  const checkOut = outVal ? new Date(outVal) : null;
+  if (checkOut && checkOut <= checkIn) { alert('وقت الانصراف يجب أن يكون بعد وقت الحضور'); return; }
+  const body = {
+    check_in: checkIn.toISOString(),
+    check_out: checkOut ? checkOut.toISOString() : null,
+    duration_min: checkOut ? Math.round((checkOut - checkIn)/60000) : null,
+    status: checkOut ? 'completed' : 'ongoing',
+    location_in: document.getElementById('lf-loc-in').value || null,
+    location_out: document.getElementById('lf-loc-out').value || null,
+    note: document.getElementById('lf-note').value || null
+  };
+  try {
+    await sb(`att_logs?id=eq.${id}`, { method:'PATCH', body });
+    document.getElementById('log-modal').classList.add('hidden');
+    await loadAllLogs();
+    await refreshStats();
+  } catch(err){ alert('فشل الحفظ: '+err.message); }
+}
+
+async function deleteLog(){
+  const id = document.getElementById('lf-id').value;
+  if (!id) return;
+  if (!confirm('حذف هذا السجل نهائياً؟')) return;
+  try {
+    await sb(`att_logs?id=eq.${id}`, { method:'DELETE' });
+    document.getElementById('log-modal').classList.add('hidden');
+    await loadAllLogs();
+    await refreshStats();
+  } catch(err){ alert('فشل الحذف: '+err.message); }
 }
 
 async function exportAllCSV(){
@@ -712,5 +774,5 @@ function wireCommon(){
   });
 }
 
-window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, state };
+window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, state };
 })();
