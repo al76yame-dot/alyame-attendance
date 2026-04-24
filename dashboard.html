@@ -10,147 +10,182 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="assets/tailwind-config.js"></script>
 <style>
-  body { font-family: "Tajawal","Plus Jakarta Sans",sans-serif; min-height: max(884px,100dvh); }
-  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
-  .glass-card { background: rgba(255,255,255,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
-  .toast { animation: slideDown .3s ease-out; }
-  @keyframes slideDown { from { opacity:0; transform: translateY(-20px);} to { opacity:1; transform: translateY(0);} }
+  body { font-family: "Tajawal","Plus Jakarta Sans",sans-serif; min-height: 100dvh; }
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; }
+  .glass-card { background: rgba(255,255,255,0.7); backdrop-filter: blur(20px); }
   .ping-ring { animation: ping-ring 2s cubic-bezier(0,0,0.2,1) infinite; }
   @keyframes ping-ring { 75%,100% { transform: scale(1.4); opacity: 0; } }
+  @keyframes slideDown { from { opacity:0; transform:translateY(-20px);} to { opacity:1; transform:translateY(0);} }
+  #map { height: 100%; width: 100%; border-radius: 1.5rem; }
+  .leaflet-container { font-family: inherit; }
+  @media (min-width: 1024px) {
+    .desktop-hide { display: none !important; }
+  }
+  @media (max-width: 1023px) {
+    .mobile-hide { display: none !important; }
+  }
 </style>
 </head>
-<body class="bg-background text-on-background min-h-screen pb-32">
-<div id="toast" class="fixed top-4 inset-x-0 mx-auto max-w-sm z-[100] hidden px-4"></div>
+<body class="bg-background text-on-background min-h-screen pb-28 lg:pb-0">
 
-<!-- TopAppBar -->
-<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-4 h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200/50 shadow-[0_4px_20px_rgba(15,76,129,0.08)]">
-  <div class="flex items-center gap-3">
-    <div id="user-initials" class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-extrabold border border-primary-container">A</div>
-    <div class="flex items-center gap-2">
-      <img alt="Alyame" class="h-9 w-auto object-contain" src="assets/logo.png"/>
-      <div class="flex flex-col leading-tight">
-        <span class="text-[11px] font-extrabold text-primary whitespace-nowrap">شركة اليامي للسفر والسياحة</span>
-        <span class="text-[9px] font-medium text-on-surface-variant whitespace-nowrap uppercase tracking-tight">Alyame Travel &amp; Tourism</span>
+<!-- Desktop Sidebar -->
+<aside class="mobile-hide fixed top-0 start-0 h-screen w-64 bg-white border-e border-outline-variant/30 z-40 flex flex-col p-5">
+  <div class="flex items-center gap-3 pb-5 border-b border-outline-variant/30">
+    <img src="assets/logo.png" class="h-12 w-12 object-contain"/>
+    <div class="min-w-0">
+      <h1 class="text-sm font-extrabold text-primary truncate">شركة اليامي للسفر</h1>
+      <p class="text-[10px] text-outline truncate uppercase">Alyame Travel</p>
+    </div>
+  </div>
+  <nav class="flex-1 py-4 space-y-1">
+    <a href="dashboard.html" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary-fixed text-primary font-bold">
+      <span class="material-symbols-outlined">dashboard</span><span data-i18n="nav.home">الرئيسية</span>
+    </a>
+    <a href="history.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-low font-semibold">
+      <span class="material-symbols-outlined">history</span><span data-i18n="nav.history">السجل</span>
+    </a>
+    <a href="admin.html" id="admin-btn" class="hidden flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-low font-semibold">
+      <span class="material-symbols-outlined">admin_panel_settings</span><span data-i18n="nav.admin">الإدارة</span>
+    </a>
+  </nav>
+  <div class="pt-4 border-t border-outline-variant/30 space-y-2">
+    <div class="flex items-center gap-3 p-2">
+      <div id="user-initials" class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-extrabold">A</div>
+      <div class="min-w-0 flex-1">
+        <p id="user-name" class="text-sm font-bold text-on-surface truncate">—</p>
+        <p id="user-role" class="text-xs text-outline truncate">—</p>
       </div>
+    </div>
+    <div class="flex gap-2">
+      <button data-toggle-lang class="flex-1 py-2 rounded-lg bg-surface-container text-primary font-semibold text-xs">AR/EN</button>
+      <button data-logout class="flex-1 py-2 rounded-lg bg-error-container text-error font-semibold text-xs flex items-center justify-center gap-1">
+        <span class="material-symbols-outlined text-[16px]">logout</span>
+      </button>
+    </div>
+  </div>
+</aside>
+
+<!-- Mobile Top Bar -->
+<header class="desktop-hide fixed top-0 left-0 w-full z-50 flex justify-between items-center px-4 h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200/50 shadow-[0_4px_20px_rgba(15,76,129,0.08)]">
+  <div class="flex items-center gap-2">
+    <img src="assets/logo.png" class="h-10 w-10 object-contain"/>
+    <div class="flex flex-col leading-tight">
+      <span class="text-[11px] font-extrabold text-primary whitespace-nowrap">شركة اليامي للسفر</span>
+      <span class="text-[9px] font-medium text-on-surface-variant whitespace-nowrap uppercase">Alyame Travel</span>
     </div>
   </div>
   <div class="flex items-center gap-1">
-    <button data-toggle-lang class="px-3 py-1.5 bg-surface-container rounded-full text-primary font-semibold text-xs flex items-center gap-1 active:scale-95 transition">
-      <span class="material-symbols-outlined text-[18px]">language</span>
-      <span>AR/EN</span>
+    <button data-toggle-lang class="px-3 py-1.5 bg-surface-container rounded-full text-primary font-semibold text-xs flex items-center gap-1">
+      <span class="material-symbols-outlined text-[18px]">language</span>AR/EN
     </button>
-    <button data-logout class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 text-primary transition" title="Logout">
+    <button data-logout class="w-10 h-10 flex items-center justify-center rounded-full text-error">
       <span class="material-symbols-outlined">logout</span>
     </button>
   </div>
 </header>
 
-<main class="pt-24 px-4 max-w-md mx-auto space-y-6">
-  <!-- Date & Time -->
-  <section class="text-center space-y-1">
-    <p id="live-date" class="text-sm font-bold text-secondary uppercase tracking-widest">—</p>
-    <h2 id="live-time" class="text-4xl font-extrabold text-primary">--:--</h2>
-    <div class="flex items-center justify-center gap-2 text-outline">
-      <span class="material-symbols-outlined text-[18px]">location_on</span>
-      <span id="live-location" class="text-sm">جاري تحديد الموقع...</span>
-    </div>
-  </section>
-
-  <!-- Check-In FAB -->
-  <section class="relative py-2">
-    <div class="glass-card rounded-[2rem] p-8 flex flex-col items-center justify-center shadow-[0_20px_50px_rgba(15,76,129,0.1)] border border-white">
-      <button id="btn-clock" class="group relative w-48 h-48 rounded-full bg-secondary-container shadow-[0_10px_30px_rgba(254,125,94,0.4)] flex flex-col items-center justify-center text-white active:scale-95 transition-all duration-300 px-6">
-        <div class="absolute inset-0 rounded-full border-4 border-white/30 ping-ring"></div>
-        <span id="clock-icon" class="material-symbols-outlined text-4xl mb-1" style="font-variation-settings:'FILL' 1;">fingerprint</span>
-        <div class="flex flex-col items-center leading-tight">
-          <span id="clock-label-ar" class="text-xl font-extrabold">تسجيل الحضور</span>
-          <span id="clock-label-en" class="text-sm font-bold opacity-90">Check In</span>
+<main class="lg:ms-64 pt-20 lg:pt-6 px-4 lg:px-8 pb-6 max-w-6xl mx-auto lg:mx-0">
+  <!-- Top row (desktop 2-col) -->
+  <div class="lg:grid lg:grid-cols-3 lg:gap-6">
+    <!-- Left/Top: Time & clock -->
+    <div class="lg:col-span-2 space-y-6">
+      <section class="text-center lg:text-start space-y-1">
+        <p id="live-date" class="text-sm font-bold text-secondary uppercase tracking-widest">—</p>
+        <h2 id="live-time" class="text-4xl lg:text-6xl font-extrabold text-primary">--:--</h2>
+        <div class="flex items-center justify-center lg:justify-start gap-2 text-outline">
+          <span class="material-symbols-outlined text-[18px]">location_on</span>
+          <span id="live-location" class="text-sm">جاري تحديد الموقع...</span>
         </div>
-      </button>
-      <div class="mt-6 text-center">
-        <p id="clock-hint" class="text-sm text-on-surface-variant">اضغط لبدء نوبة عملك.<br/>Tap to start your shift.</p>
-        <p id="verify-status" class="mt-1"><span class="text-outline font-semibold">جاري التحقق من الموقع...</span></p>
-      </div>
-    </div>
-  </section>
+      </section>
 
-  <!-- Stats Grid -->
-  <section class="grid grid-cols-2 gap-4">
-    <div class="bg-surface-container-low p-4 rounded-3xl border border-outline-variant/30">
-      <div class="flex items-center gap-2 text-primary mb-2">
-        <span class="material-symbols-outlined text-[20px]">schedule</span>
-        <span class="text-xs font-bold leading-tight">ساعات العمل<br/>Work Hours</span>
-      </div>
-      <p id="stat-hours" class="text-2xl font-extrabold text-primary">0h 00m</p>
-      <p class="text-[11px] text-outline mt-1">الهدف ٨س | Goal: 8h 00m</p>
-    </div>
-    <div class="bg-surface-container-low p-4 rounded-3xl border border-outline-variant/30">
-      <div class="flex items-center gap-2 text-tertiary mb-2">
-        <span class="material-symbols-outlined text-[20px]">login</span>
-        <span class="text-xs font-bold leading-tight">آخر حضور<br/>Last Check-in</span>
-      </div>
-      <p id="stat-last" class="text-2xl font-extrabold text-tertiary">--:--</p>
-      <p id="stat-status" class="text-[11px] text-outline mt-1">غير متصل | Offline</p>
-    </div>
-  </section>
-
-  <!-- Live Map -->
-  <section class="space-y-3">
-    <div class="flex justify-between items-center px-1">
-      <h3 class="text-base font-bold text-primary flex flex-col leading-tight">
-        <span>الموقع المباشر</span>
-        <span class="text-xs font-medium opacity-70">Live Location</span>
-      </h3>
-      <span class="flex items-center gap-1 text-tertiary text-sm font-semibold">
-        <span class="w-2 h-2 bg-tertiary-container rounded-full animate-pulse"></span>
-        تتبع مباشر | Live
-      </span>
-    </div>
-    <div class="relative h-48 rounded-3xl overflow-hidden border border-outline-variant/50 shadow-sm bg-surface-container">
-      <img id="map-img" class="w-full h-full object-cover grayscale-[15%]" src="assets/map-placeholder.svg" alt="Map"/>
-      <div class="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent pointer-events-none"></div>
-      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-        <div class="w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center p-1 border-2 border-primary">
-          <span class="material-symbols-outlined text-primary text-[22px]" style="font-variation-settings:'FILL' 1;">person_pin_circle</span>
+      <!-- Big clock card -->
+      <section class="glass-card rounded-[2rem] p-6 md:p-8 flex flex-col lg:flex-row items-center gap-6 shadow-[0_20px_50px_rgba(15,76,129,0.1)] border border-white">
+        <button id="btn-clock" class="group relative w-44 h-44 md:w-52 md:h-52 rounded-full bg-secondary-container shadow-[0_10px_30px_rgba(254,125,94,0.4)] flex flex-col items-center justify-center text-white active:scale-95 transition-all px-4 shrink-0">
+          <div class="absolute inset-0 rounded-full border-4 border-white/30 ping-ring"></div>
+          <span id="clock-icon" class="material-symbols-outlined text-4xl mb-1" style="font-variation-settings:'FILL' 1;">fingerprint</span>
+          <div class="flex flex-col items-center leading-tight">
+            <span id="clock-label-ar" class="text-xl font-extrabold">تسجيل الحضور</span>
+            <span id="clock-label-en" class="text-sm font-bold opacity-90">Check In</span>
+          </div>
+        </button>
+        <div class="text-center lg:text-start">
+          <p id="clock-hint" class="text-base text-on-surface-variant">اضغط لبدء نوبة عملك</p>
+          <p id="verify-status" class="mt-2"><span class="text-outline font-semibold">جاري التحقق من الموقع...</span></p>
         </div>
-        <div class="mt-1 bg-primary text-white px-3 py-0.5 rounded-full text-[9px] font-bold shadow-md">أنت | YOU</div>
-      </div>
-      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 border-2 border-primary/20 rounded-full animate-pulse pointer-events-none"></div>
+      </section>
+
+      <!-- Stats -->
+      <section class="grid grid-cols-2 gap-3 md:gap-4">
+        <div class="bg-surface-container-low p-4 rounded-3xl border border-outline-variant/30">
+          <div class="flex items-center gap-2 text-primary mb-2">
+            <span class="material-symbols-outlined text-[20px]">schedule</span>
+            <span class="text-xs font-bold leading-tight">ساعات العمل<br/>Work Hours</span>
+          </div>
+          <p id="stat-hours" class="text-2xl md:text-3xl font-extrabold text-primary">0h 00m</p>
+          <p class="text-[11px] text-outline mt-1">الهدف ٨س | Goal: 8h</p>
+        </div>
+        <div class="bg-surface-container-low p-4 rounded-3xl border border-outline-variant/30">
+          <div class="flex items-center gap-2 text-tertiary mb-2">
+            <span class="material-symbols-outlined text-[20px]">login</span>
+            <span class="text-xs font-bold leading-tight">آخر حضور<br/>Last Check-in</span>
+          </div>
+          <p id="stat-last" class="text-2xl md:text-3xl font-extrabold text-tertiary">--:--</p>
+          <p id="stat-status" class="text-[11px] text-outline mt-1">غير متصل | Offline</p>
+        </div>
+      </section>
     </div>
-  </section>
+
+    <!-- Right: Live Map -->
+    <div class="mt-6 lg:mt-0 lg:col-span-1 space-y-3">
+      <div class="flex justify-between items-center px-1">
+        <h3 class="text-base font-bold text-primary flex flex-col leading-tight">
+          <span>الموقع المباشر</span>
+          <span class="text-xs font-medium opacity-70">Live Location</span>
+        </h3>
+        <span class="flex items-center gap-1 text-tertiary text-sm font-semibold">
+          <span class="w-2 h-2 bg-tertiary-container rounded-full animate-pulse"></span>Live
+        </span>
+      </div>
+      <div class="h-64 lg:h-96 rounded-3xl overflow-hidden border border-outline-variant/50 shadow-sm bg-surface-container">
+        <div id="map"></div>
+      </div>
+    </div>
+  </div>
 
   <!-- Recent -->
-  <section class="space-y-4 pb-4">
+  <section class="mt-6 space-y-4">
     <div class="flex justify-between items-center px-1">
       <h3 class="text-base font-bold text-primary flex flex-col leading-tight">
         <span>النشاط الأخير</span>
         <span class="text-xs font-medium opacity-70">Recent Activity</span>
       </h3>
-      <button data-nav="history.html" class="text-sm text-primary font-semibold flex items-center gap-1">
-        <span>عرض الكل</span>
+      <a href="history.html" class="text-sm text-primary font-semibold flex items-center gap-1">
+        <span>عرض الكل / View all</span>
         <span class="material-symbols-outlined text-[18px] rtl:rotate-180">arrow_forward</span>
-      </button>
+      </a>
     </div>
-    <div id="recent-list" class="space-y-3"></div>
+    <div id="recent-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
   </section>
 </main>
 
-<!-- BottomNav -->
-<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-white/70 backdrop-blur-2xl border-t border-slate-200/50 shadow-[0_-4px_20px_rgba(15,76,129,0.08)] rounded-t-2xl">
-  <button data-nav="dashboard.html" class="flex flex-col items-center justify-center bg-blue-50 text-primary rounded-xl px-3 py-1 active:scale-90 transition">
+<!-- Mobile bottom nav -->
+<nav class="desktop-hide fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-white/80 backdrop-blur-2xl border-t border-slate-200/50 shadow-[0_-4px_20px_rgba(15,76,129,0.08)] rounded-t-2xl">
+  <a href="dashboard.html" class="flex flex-col items-center bg-blue-50 text-primary rounded-xl px-3 py-1">
     <span class="material-symbols-outlined">dashboard</span>
-    <span class="text-[10px] font-semibold leading-none text-center mt-0.5">الرئيسية<br/>Dashboard</span>
-  </button>
-  <button data-nav="history.html" class="flex flex-col items-center justify-center text-slate-400 active:scale-90 transition">
+    <span class="text-[10px] font-semibold mt-0.5" data-i18n="nav.home">الرئيسية</span>
+  </a>
+  <a href="history.html" class="flex flex-col items-center text-slate-400">
     <span class="material-symbols-outlined">history</span>
-    <span class="text-[10px] font-semibold leading-none text-center mt-0.5">السجل<br/>History</span>
-  </button>
-  <button data-logout class="flex flex-col items-center justify-center text-slate-400 active:scale-90 transition">
-    <span class="material-symbols-outlined">person</span>
-    <span class="text-[10px] font-semibold leading-none text-center mt-0.5">خروج<br/>Logout</span>
-  </button>
+    <span class="text-[10px] font-semibold mt-0.5" data-i18n="nav.history">السجل</span>
+  </a>
+  <a href="admin.html" id="admin-btn" class="hidden flex flex-col items-center text-slate-400">
+    <span class="material-symbols-outlined">admin_panel_settings</span>
+    <span class="text-[10px] font-semibold mt-0.5" data-i18n="nav.admin">الإدارة</span>
+  </a>
 </nav>
 
 <script src="assets/app.js"></script>

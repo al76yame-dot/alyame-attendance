@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#00355f"/>
+<title>الإدارة | Admin Panel</title>
+<link rel="icon" href="assets/logo.png"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="assets/tailwind-config.js"></script>
+<style>
+  body { font-family: "Tajawal","Plus Jakarta Sans",sans-serif; min-height: 100dvh; }
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; }
+  #livemap { height: 100%; width: 100%; border-radius: 1.5rem; }
+  @keyframes slideDown { from { opacity:0; transform:translateY(-20px);} to { opacity:1; transform:translateY(0);} }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal-overlay { animation: fadeIn .2s ease-out; }
+  @media (min-width: 1024px) { .desktop-hide { display: none !important; } }
+  @media (max-width: 1023px) { .mobile-hide { display: none !important; } }
+</style>
+</head>
+<body class="bg-background text-on-background min-h-screen pb-28 lg:pb-0">
+
+<!-- Sidebar -->
+<aside class="mobile-hide fixed top-0 start-0 h-screen w-64 bg-white border-e border-outline-variant/30 z-40 flex flex-col p-5">
+  <div class="flex items-center gap-3 pb-5 border-b border-outline-variant/30">
+    <img src="assets/logo.png" class="h-12 w-12 object-contain"/>
+    <div class="min-w-0">
+      <h1 class="text-sm font-extrabold text-primary truncate">شركة اليامي للسفر</h1>
+      <p class="text-[10px] text-outline truncate uppercase">Admin Panel</p>
+    </div>
+  </div>
+  <nav class="flex-1 py-4 space-y-1">
+    <a href="dashboard.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-low font-semibold">
+      <span class="material-symbols-outlined">dashboard</span><span>الرئيسية</span>
+    </a>
+    <a href="history.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-low font-semibold">
+      <span class="material-symbols-outlined">history</span><span>السجل</span>
+    </a>
+    <a href="admin.html" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary-fixed text-primary font-bold">
+      <span class="material-symbols-outlined">admin_panel_settings</span><span>الإدارة</span>
+    </a>
+  </nav>
+  <div class="pt-4 border-t border-outline-variant/30 space-y-2">
+    <div class="flex items-center gap-3 p-2">
+      <div id="user-initials" class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-extrabold">A</div>
+    </div>
+    <div class="flex gap-2">
+      <button data-toggle-lang class="flex-1 py-2 rounded-lg bg-surface-container text-primary font-semibold text-xs">AR/EN</button>
+      <button data-logout class="flex-1 py-2 rounded-lg bg-error-container text-error font-semibold text-xs">
+        <span class="material-symbols-outlined text-[16px]">logout</span>
+      </button>
+    </div>
+  </div>
+</aside>
+
+<!-- Mobile header -->
+<header class="desktop-hide fixed top-0 left-0 w-full z-50 flex justify-between items-center px-4 h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200/50">
+  <div class="flex items-center gap-2">
+    <img src="assets/logo.png" class="h-10 w-10 object-contain"/>
+    <div class="flex flex-col leading-tight">
+      <span class="text-[11px] font-extrabold text-primary">الإدارة / Admin</span>
+      <span class="text-[9px] text-on-surface-variant uppercase">Alyame Travel</span>
+    </div>
+  </div>
+  <div class="flex items-center gap-1">
+    <button data-toggle-lang class="px-3 py-1.5 bg-surface-container rounded-full text-primary font-semibold text-xs">AR/EN</button>
+    <button data-logout class="w-10 h-10 flex items-center justify-center text-error">
+      <span class="material-symbols-outlined">logout</span>
+    </button>
+  </div>
+</header>
+
+<main class="lg:ms-64 pt-20 lg:pt-6 px-4 lg:px-8 pb-6 max-w-7xl mx-auto lg:mx-0">
+  <div class="flex flex-col gap-1 mb-5">
+    <h2 class="text-2xl lg:text-3xl font-extrabold text-primary">لوحة الإدارة / Admin Panel</h2>
+    <p class="text-sm text-on-surface-variant">إدارة الموظفين ومتابعة الحضور / Manage employees and monitor attendance</p>
+  </div>
+
+  <!-- Stats cards -->
+  <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30">
+      <div class="flex items-center gap-2 text-primary mb-1">
+        <span class="material-symbols-outlined text-[20px]">group</span>
+        <span class="text-xs font-bold" data-i18n="admin.totalEmp">إجمالي الموظفين</span>
+      </div>
+      <p id="stat-total-emp" class="text-3xl font-extrabold text-primary">0</p>
+    </div>
+    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30">
+      <div class="flex items-center gap-2 text-tertiary mb-1">
+        <span class="material-symbols-outlined text-[20px]">sensors</span>
+        <span class="text-xs font-bold" data-i18n="admin.activeNow">نشط الآن</span>
+      </div>
+      <p id="stat-active-now" class="text-3xl font-extrabold text-tertiary">0</p>
+    </div>
+    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30">
+      <div class="flex items-center gap-2 text-secondary mb-1">
+        <span class="material-symbols-outlined text-[20px]">today</span>
+        <span class="text-xs font-bold" data-i18n="admin.todayLogs">سجلات اليوم</span>
+      </div>
+      <p id="stat-today-logs" class="text-3xl font-extrabold text-secondary">0</p>
+    </div>
+    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30">
+      <div class="flex items-center gap-2 text-primary mb-1">
+        <span class="material-symbols-outlined text-[20px]">schedule</span>
+        <span class="text-xs font-bold" data-i18n="admin.totalHours">ساعات اليوم</span>
+      </div>
+      <p id="stat-today-hours" class="text-3xl font-extrabold text-primary">0h</p>
+    </div>
+  </section>
+
+  <!-- Tabs -->
+  <div class="flex gap-2 mb-5 overflow-x-auto pb-2">
+    <button data-tab="employees" class="px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap bg-primary text-white flex items-center gap-1.5">
+      <span class="material-symbols-outlined text-[18px]">group</span>
+      <span data-i18n="admin.employees">الموظفون</span>
+    </button>
+    <button data-tab="logs" class="px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap bg-surface-container text-on-surface-variant flex items-center gap-1.5">
+      <span class="material-symbols-outlined text-[18px]">list_alt</span>
+      <span data-i18n="admin.logs">السجلات</span>
+    </button>
+    <button data-tab="livemap" class="px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap bg-surface-container text-on-surface-variant flex items-center gap-1.5">
+      <span class="material-symbols-outlined text-[18px]">map</span>
+      <span data-i18n="admin.livemap">خريطة حية</span>
+    </button>
+  </div>
+
+  <!-- Employees tab -->
+  <section data-tabpane="employees" class="space-y-4">
+    <div class="flex justify-between items-center">
+      <h3 class="text-lg font-bold text-primary">الموظفون / Employees</h3>
+      <button id="btn-add-emp" class="px-4 py-2 bg-primary text-white font-semibold rounded-xl flex items-center gap-2 hover:bg-primary-container transition">
+        <span class="material-symbols-outlined text-[20px]">person_add</span>
+        <span data-i18n="admin.addEmp">إضافة موظف</span>
+      </button>
+    </div>
+    <div id="emp-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+  </section>
+
+  <!-- Logs tab -->
+  <section data-tabpane="logs" class="hidden space-y-4">
+    <div class="flex justify-between items-center flex-wrap gap-2">
+      <h3 class="text-lg font-bold text-primary">سجلات الحضور / Attendance Logs</h3>
+      <button id="admin-export" class="px-4 py-2 bg-surface-container text-primary font-semibold rounded-xl flex items-center gap-2 hover:bg-surface-container-high">
+        <span class="material-symbols-outlined text-[20px]">download</span>
+        <span>تصدير الكل / Export All</span>
+      </button>
+    </div>
+    <div id="logs-list" class="space-y-2"></div>
+  </section>
+
+  <!-- Live map tab -->
+  <section data-tabpane="livemap" class="hidden space-y-3">
+    <h3 class="text-lg font-bold text-primary">الموظفون النشطون / Active Employees</h3>
+    <div id="livemap-info" class="bg-surface-container-low p-3 rounded-xl"></div>
+    <div class="h-96 rounded-3xl overflow-hidden border border-outline-variant/50 shadow-sm bg-surface-container">
+      <div id="livemap"></div>
+    </div>
+  </section>
+</main>
+
+<!-- Employee Modal -->
+<div id="emp-modal" class="hidden fixed inset-0 z-[100] flex items-end lg:items-center justify-center p-0 lg:p-6 bg-black/50 backdrop-blur-sm modal-overlay">
+  <div class="bg-white w-full lg:max-w-lg rounded-t-3xl lg:rounded-3xl shadow-2xl max-h-[92vh] overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-outline-variant/30 px-5 py-4 flex items-center justify-between">
+      <h3 id="emp-modal-title" class="text-lg font-bold text-primary">إضافة موظف</h3>
+      <button id="btn-cancel-emp" class="w-9 h-9 rounded-full hover:bg-surface-container flex items-center justify-center">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <form id="emp-form" class="p-5 space-y-4">
+      <input type="hidden" id="emp-id"/>
+      <div>
+        <label class="text-sm font-semibold text-on-surface-variant mb-1 block" data-i18n="admin.name">الاسم</label>
+        <input id="emp-name" type="text" required class="w-full h-12 px-4 bg-white border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none"/>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-sm font-semibold text-on-surface-variant mb-1 block" data-i18n="admin.phone">الهاتف</label>
+          <input id="emp-phone" type="text" required dir="ltr" class="w-full h-12 px-4 bg-white border border-outline-variant rounded-xl focus:border-primary outline-none"/>
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-on-surface-variant mb-1 block" data-i18n="admin.pin">الرمز السري</label>
+          <input id="emp-pin" type="text" inputmode="numeric" dir="ltr" class="w-full h-12 px-4 bg-white border border-outline-variant rounded-xl focus:border-primary outline-none tracking-widest" placeholder="1234"/>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-sm font-semibold text-on-surface-variant mb-1 block" data-i18n="admin.role">الدور</label>
+          <select id="emp-role" class="w-full h-12 px-3 bg-white border border-outline-variant rounded-xl focus:border-primary outline-none">
+            <option value="agent">موظف حجوزات</option>
+            <option value="guide">مرشد سياحي</option>
+            <option value="manager">مدير</option>
+            <option value="driver">سائق</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-on-surface-variant mb-1 block" data-i18n="admin.branch">الفرع</label>
+          <input id="emp-branch" type="text" class="w-full h-12 px-4 bg-white border border-outline-variant rounded-xl focus:border-primary outline-none" placeholder="طرابلس"/>
+        </div>
+      </div>
+      <div class="flex gap-4 pt-2">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input id="emp-admin" type="checkbox" class="w-5 h-5 rounded border-outline-variant text-primary"/>
+          <span class="text-sm font-semibold" data-i18n="admin.isAdmin">مدير</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input id="emp-active" type="checkbox" checked class="w-5 h-5 rounded border-outline-variant text-primary"/>
+          <span class="text-sm font-semibold" data-i18n="admin.active">نشط</span>
+        </label>
+      </div>
+      <div class="flex gap-2 pt-3 border-t border-outline-variant/30">
+        <button type="button" id="btn-cancel-emp-2" onclick="document.getElementById('emp-modal').classList.add('hidden')" class="flex-1 h-12 bg-surface-container text-on-surface font-semibold rounded-xl" data-i18n="admin.cancel">إلغاء</button>
+        <button type="submit" class="flex-1 h-12 bg-primary text-white font-bold rounded-xl" data-i18n="admin.save">حفظ</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Mobile bottom nav -->
+<nav class="desktop-hide fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-white/80 backdrop-blur-2xl border-t border-slate-200/50 rounded-t-2xl">
+  <a href="dashboard.html" class="flex flex-col items-center text-slate-400">
+    <span class="material-symbols-outlined">dashboard</span>
+    <span class="text-[10px] font-semibold mt-0.5">الرئيسية</span>
+  </a>
+  <a href="history.html" class="flex flex-col items-center text-slate-400">
+    <span class="material-symbols-outlined">history</span>
+    <span class="text-[10px] font-semibold mt-0.5">السجل</span>
+  </a>
+  <a href="admin.html" class="flex flex-col items-center bg-blue-50 text-primary rounded-xl px-3 py-1">
+    <span class="material-symbols-outlined">admin_panel_settings</span>
+    <span class="text-[10px] font-semibold mt-0.5">الإدارة</span>
+  </a>
+</nav>
+
+<script src="assets/app.js"></script>
+<script>App.initAdmin();</script>
+</body>
+</html>
