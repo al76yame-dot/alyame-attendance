@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.04.25.6';
+const APP_VERSION = '2026.04.25.7';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -185,26 +185,33 @@ function phoneVariants(phone){
   const variants = new Set();
   variants.add(raw);
   let d = digitsOnly(raw);
-  // strip any known country code prefix
+  // strip leading 00 (international prefix)
+  if (d.startsWith('00')) d = d.slice(2);
+  // strip any known country code prefix (possibly multiple times for double-prefix bugs)
   let local = d;
-  let cc = '';
-  for (const c of COUNTRY_CODES){
-    if (d.startsWith(c)) { local = d.slice(c.length); cc = c; break; }
+  let stripped = true;
+  while (stripped){
+    stripped = false;
+    for (const c of COUNTRY_CODES){
+      if (local.length > c.length + 4 && local.startsWith(c)) {
+        local = local.slice(c.length); stripped = true; break;
+      }
+    }
   }
-  // strip leading zero from local part
-  if (local.startsWith('0')) local = local.slice(1);
-  // generate variants
+  // strip leading zeros from local part
+  while (local.startsWith('0')) local = local.slice(1);
+  // generate every reasonable variant
   variants.add(d);
   variants.add(local);
   variants.add('0'+local);
+  variants.add('00'+local);
   for (const c of COUNTRY_CODES){
     variants.add(c+local);
     variants.add('+'+c+local);
-    variants.add('+'+c+' '+local);
-  }
-  if (cc){
-    variants.add(cc+local);
-    variants.add('+'+cc+local);
+    variants.add('00'+c+local);
+    variants.add(c+'0'+local);
+    variants.add('+'+c+'0'+local);
+    variants.add('00'+c+'0'+local);
   }
   return [...variants].filter(Boolean);
 }
