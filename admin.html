@@ -180,8 +180,15 @@
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="text-sm font-semibold text-on-surface-variant mb-1 block" data-i18n="admin.phone">الهاتف</label>
-          <input id="emp-phone" type="text" required dir="ltr" class="w-full h-12 px-4 bg-white border border-outline-variant rounded-xl focus:border-primary outline-none"/>
+          <label class="text-sm font-semibold text-on-surface-variant mb-1 block" data-i18n="admin.phone">الهاتف (مع كود الدولة)</label>
+          <div class="flex" dir="ltr">
+            <select id="emp-cc" class="px-2 bg-surface-container-low border border-outline-variant border-e-0 rounded-s-xl h-12 text-sm font-semibold focus:outline-none">
+              <option value="+218">🇱🇾 +218</option>
+              <option value="+20">🇪🇬 +20</option>
+              <option value="">—</option>
+            </select>
+            <input id="emp-phone" type="text" required dir="ltr" placeholder="912345678" class="w-full h-12 px-3 bg-white border border-outline-variant rounded-e-xl focus:border-primary outline-none"/>
+          </div>
         </div>
         <div>
           <label class="text-sm font-semibold text-on-surface-variant mb-1 block" data-i18n="admin.pin">الرمز السري</label>

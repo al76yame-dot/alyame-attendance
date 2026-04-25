@@ -155,33 +155,45 @@ function pinIcon(color='#00355f', letter='A'){
 }
 
 // ============= Auth =============
-function normalizePhone(p){
-  if (!p) return '';
-  const raw = String(p).trim();
-  if (raw.toLowerCase() === 'admin') return 'admin';
-  // remove spaces, dashes, parentheses, plus
-  let n = raw.replace(/[\s\-\(\)\+]/g,'');
-  // strip leading 218 (Libya country code) if present
-  if (n.startsWith('218')) n = n.slice(3);
-  // strip leading 0 if present
-  if (n.startsWith('0')) n = n.slice(1);
-  return n;
+// Country codes used by Alyame (Libya: 218, Egypt: 20). Add more here when expanding.
+const COUNTRY_CODES = ['218','20'];
+
+function digitsOnly(p){ return String(p||'').replace(/\D/g,''); }
+
+function phoneVariants(phone){
+  const raw = String(phone||'').trim();
+  if (!raw) return [];
+  if (raw.toLowerCase() === 'admin') return ['admin'];
+  const variants = new Set();
+  variants.add(raw);
+  let d = digitsOnly(raw);
+  // strip any known country code prefix
+  let local = d;
+  let cc = '';
+  for (const c of COUNTRY_CODES){
+    if (d.startsWith(c)) { local = d.slice(c.length); cc = c; break; }
+  }
+  // strip leading zero from local part
+  if (local.startsWith('0')) local = local.slice(1);
+  // generate variants
+  variants.add(d);
+  variants.add(local);
+  variants.add('0'+local);
+  for (const c of COUNTRY_CODES){
+    variants.add(c+local);
+    variants.add('+'+c+local);
+    variants.add('+'+c+' '+local);
+  }
+  if (cc){
+    variants.add(cc+local);
+    variants.add('+'+cc+local);
+  }
+  return [...variants].filter(Boolean);
 }
 
 async function login(phone, pin){
   const pin_hash = await sha256(pin);
-  const variants = new Set();
-  const norm = normalizePhone(phone);
-  variants.add(phone.trim());
-  variants.add(norm);
-  if (norm && norm !== 'admin') {
-    variants.add('+218'+norm);
-    variants.add('218'+norm);
-    variants.add('0'+norm);
-  }
-  const list = [...variants].filter(Boolean);
-  // try each variant
-  for (const v of list) {
+  for (const v of phoneVariants(phone)) {
     const rows = await sb(`att_employees?phone=eq.${encodeURIComponent(v)}&pin_hash=eq.${pin_hash}&active=eq.true`);
     if (rows && rows.length) {
       const u = rows[0];
@@ -242,7 +254,12 @@ async function initLogin(){
   document.querySelectorAll('.lang-btn').forEach(b => b.onclick = () => { state.lang=b.dataset.lang; saveSess(); applyLangDir(); });
   document.getElementById('login-form').onsubmit = async e => {
     e.preventDefault();
-    const phone = document.getElementById('f-phone').value.trim();
+    const ccEl = document.getElementById('f-cc');
+    const cc = ccEl ? ccEl.value : '';
+    const rawPhone = document.getElementById('f-phone').value.trim();
+    const phone = (cc && rawPhone.toLowerCase()!=='admin' && !rawPhone.startsWith('+') && !rawPhone.startsWith(cc.replace('+','')))
+      ? cc + rawPhone.replace(/^0/,'')
+      : rawPhone;
     const pin = document.getElementById('f-pin').value.trim();
     if (!phone || !pin) return toast(t('login.fillAll'),'error');
     const btn = document.getElementById('f-submit'); btn.disabled=true; btn.classList.add('opacity-60');
@@ -642,7 +659,20 @@ function openEmpModal(e){
   document.getElementById('emp-modal-title').textContent = e ? t('admin.edit') : t('admin.addEmp');
   document.getElementById('emp-id').value = e?.id || '';
   document.getElementById('emp-name').value = e?.name || '';
-  document.getElementById('emp-phone').value = e?.phone || '';
+  // split stored phone into cc + local for display
+  const ccSel = document.getElementById('emp-cc');
+  const phoneInput = document.getElementById('emp-phone');
+  const stored = e?.phone || '';
+  if (stored && stored.toLowerCase()!=='admin') {
+    const d = stored.replace(/\D/g,'');
+    let matched = false;
+    for (const c of COUNTRY_CODES) {
+      if (d.startsWith(c)) { if (ccSel) ccSel.value = '+'+c; phoneInput.value = d.slice(c.length); matched = true; break; }
+    }
+    if (!matched) { if (ccSel) ccSel.value = ''; phoneInput.value = stored; }
+  } else {
+    phoneInput.value = stored;
+  }
   document.getElementById('emp-role').value = e?.role || 'agent';
   document.getElementById('emp-branch').value = e?.branch || '';
   document.getElementById('emp-pin').value = '';
@@ -656,7 +686,17 @@ async function saveEmp(e){
   e.preventDefault();
   const id = document.getElementById('emp-id').value;
   const name = document.getElementById('emp-name').value.trim();
-  const phone = document.getElementById('emp-phone').value.trim();
+  let phoneRaw = document.getElementById('emp-phone').value.trim();
+  const empCcEl = document.getElementById('emp-cc');
+  const empCc = empCcEl ? empCcEl.value : '';
+  let phone;
+  if (phoneRaw.toLowerCase()==='admin') {
+    phone = 'admin';
+  } else if (empCc && !phoneRaw.startsWith('+')) {
+    phone = empCc + phoneRaw.replace(/^0/,'').replace(/\s/g,'');
+  } else {
+    phone = phoneRaw;
+  }
   const role = document.getElementById('emp-role').value;
   const branch = document.getElementById('emp-branch').value.trim() || null;
   const pin = document.getElementById('emp-pin').value.trim();
