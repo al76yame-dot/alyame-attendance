@@ -155,14 +155,42 @@ function pinIcon(color='#00355f', letter='A'){
 }
 
 // ============= Auth =============
+function normalizePhone(p){
+  if (!p) return '';
+  const raw = String(p).trim();
+  if (raw.toLowerCase() === 'admin') return 'admin';
+  // remove spaces, dashes, parentheses, plus
+  let n = raw.replace(/[\s\-\(\)\+]/g,'');
+  // strip leading 218 (Libya country code) if present
+  if (n.startsWith('218')) n = n.slice(3);
+  // strip leading 0 if present
+  if (n.startsWith('0')) n = n.slice(1);
+  return n;
+}
+
 async function login(phone, pin){
   const pin_hash = await sha256(pin);
-  const rows = await sb(`att_employees?phone=eq.${encodeURIComponent(phone)}&pin_hash=eq.${pin_hash}&active=eq.true`);
-  if (!rows || !rows.length) throw new Error('invalid');
-  const u = rows[0];
-  state.user = { id: u.id, name: u.name, phone: u.phone, role: u.role, is_admin: u.is_admin, branch: u.branch };
-  saveSess();
-  return u;
+  const variants = new Set();
+  const norm = normalizePhone(phone);
+  variants.add(phone.trim());
+  variants.add(norm);
+  if (norm && norm !== 'admin') {
+    variants.add('+218'+norm);
+    variants.add('218'+norm);
+    variants.add('0'+norm);
+  }
+  const list = [...variants].filter(Boolean);
+  // try each variant
+  for (const v of list) {
+    const rows = await sb(`att_employees?phone=eq.${encodeURIComponent(v)}&pin_hash=eq.${pin_hash}&active=eq.true`);
+    if (rows && rows.length) {
+      const u = rows[0];
+      state.user = { id: u.id, name: u.name, phone: u.phone, role: u.role, is_admin: u.is_admin, branch: u.branch };
+      saveSess();
+      return u;
+    }
+  }
+  throw new Error('invalid');
 }
 
 async function loadCurrentLog(){
