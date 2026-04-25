@@ -1,9 +1,27 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
+const APP_VERSION = '2026.04.25.6';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
-const LS_USER='alyame_sess', LS_LANG='alyame_lang';
+const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
+
+// Auto-update detector: checks GitHub for newer version every page load
+async function checkForUpdates(){
+  try {
+    const r = await fetch('version.txt?_=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const remote = (await r.text()).trim();
+    const local = localStorage.getItem(LS_VER);
+    if (!local) { localStorage.setItem(LS_VER, remote); return; }
+    if (remote && remote !== local) {
+      localStorage.setItem(LS_VER, remote);
+      // soft reload bypassing cache
+      location.reload();
+    }
+  } catch(_){}
+}
+checkForUpdates();
 
 // ============= Supabase REST client (no SDK needed) =============
 async function sb(path, opts={}){
