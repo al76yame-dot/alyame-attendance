@@ -192,11 +192,15 @@
         <span class="text-2xl">🇱🇾</span>
         <h4 class="font-bold">مكتب طرابلس / Tripoli Office</h4>
       </div>
-      <div class="grid grid-cols-2 gap-2">
-        <div><label class="text-xs">خط العرض (lat)</label><input id="set-tripoli-lat" type="number" step="any" class="w-full h-11 px-3 border rounded-lg" dir="ltr"/></div>
-        <div><label class="text-xs">خط الطول (lng)</label><input id="set-tripoli-lng" type="number" step="any" class="w-full h-11 px-3 border rounded-lg" dir="ltr"/></div>
+      <p class="text-xs text-outline">اضغط على الخريطة لتحديد الموقع، أو اسحب الدبوس لتعديله</p>
+      <div class="h-64 rounded-xl overflow-hidden border border-outline-variant/40">
+        <div id="map-tripoli" class="w-full h-full"></div>
       </div>
-      <button onclick="App.useMyLocation('tripoli')" class="text-xs text-primary font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">my_location</span>استخدم موقعي الحالي</button>
+      <div class="grid grid-cols-3 gap-2 items-end">
+        <div><label class="text-xs">lat</label><input id="set-tripoli-lat" type="number" step="any" readonly class="w-full h-10 px-2 border rounded-lg bg-surface-container-low text-xs" dir="ltr"/></div>
+        <div><label class="text-xs">lng</label><input id="set-tripoli-lng" type="number" step="any" readonly class="w-full h-10 px-2 border rounded-lg bg-surface-container-low text-xs" dir="ltr"/></div>
+        <button type="button" onclick="App.useMyLocation('tripoli')" class="h-10 bg-primary-fixed text-primary font-bold rounded-lg text-xs flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[16px]">my_location</span>موقعي</button>
+      </div>
     </div>
 
     <div class="bg-white p-4 rounded-2xl border border-outline-variant/30 space-y-3">
@@ -204,11 +208,15 @@
         <span class="text-2xl">🇪🇬</span>
         <h4 class="font-bold">مكتب القاهرة / Cairo Office</h4>
       </div>
-      <div class="grid grid-cols-2 gap-2">
-        <div><label class="text-xs">خط العرض (lat)</label><input id="set-cairo-lat" type="number" step="any" class="w-full h-11 px-3 border rounded-lg" dir="ltr"/></div>
-        <div><label class="text-xs">خط الطول (lng)</label><input id="set-cairo-lng" type="number" step="any" class="w-full h-11 px-3 border rounded-lg" dir="ltr"/></div>
+      <p class="text-xs text-outline">اضغط على الخريطة لتحديد الموقع، أو اسحب الدبوس لتعديله</p>
+      <div class="h-64 rounded-xl overflow-hidden border border-outline-variant/40">
+        <div id="map-cairo" class="w-full h-full"></div>
       </div>
-      <button onclick="App.useMyLocation('cairo')" class="text-xs text-primary font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">my_location</span>استخدم موقعي الحالي</button>
+      <div class="grid grid-cols-3 gap-2 items-end">
+        <div><label class="text-xs">lat</label><input id="set-cairo-lat" type="number" step="any" readonly class="w-full h-10 px-2 border rounded-lg bg-surface-container-low text-xs" dir="ltr"/></div>
+        <div><label class="text-xs">lng</label><input id="set-cairo-lng" type="number" step="any" readonly class="w-full h-10 px-2 border rounded-lg bg-surface-container-low text-xs" dir="ltr"/></div>
+        <button type="button" onclick="App.useMyLocation('cairo')" class="h-10 bg-primary-fixed text-primary font-bold rounded-lg text-xs flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[16px]">my_location</span>موقعي</button>
+      </div>
     </div>
 
     <div class="bg-white p-4 rounded-2xl border border-outline-variant/30 space-y-3">
@@ -354,7 +362,7 @@
   </a>
 </nav>
 
-<script src="assets/app.js?v=2026.04.25.8"></script>
+<script src="assets/app.js?v=2026.04.25.9"></script>
 <script>App.initAdmin();</script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.04.25.8';
+const APP_VERSION = '2026.04.25.9';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -516,15 +516,58 @@ async function refreshPendingBadge(){
 }
 
 // ============= Admin: Settings =============
+let _branchMaps = {};
+
+function setupBranchMap(branch, defaultLat, defaultLng){
+  const containerId = `map-${branch}`;
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  // tear down old instance if switching tabs
+  if (_branchMaps[branch]) { _branchMaps[branch].map.remove(); delete _branchMaps[branch]; }
+  const latInput = document.getElementById(`set-${branch}-lat`);
+  const lngInput = document.getElementById(`set-${branch}-lng`);
+  const lat = parseFloat(latInput.value) || defaultLat;
+  const lng = parseFloat(lngInput.value) || defaultLng;
+  const map = createMap(containerId, [lat, lng], 16);
+  const radius = parseInt(document.getElementById('set-radius').value || '300');
+  const marker = L.marker([lat, lng], { draggable: true, icon: pinIcon('#00355f','📍') }).addTo(map);
+  const circle = L.circle([lat, lng], { radius, color:'#00355f', fillColor:'#8ebdf9', fillOpacity:0.2, weight:2 }).addTo(map);
+  const update = (latlng) => {
+    marker.setLatLng(latlng);
+    circle.setLatLng(latlng);
+    latInput.value = latlng.lat.toFixed(6);
+    lngInput.value = latlng.lng.toFixed(6);
+  };
+  marker.on('dragend', e => update(e.target.getLatLng()));
+  map.on('click', e => update(e.latlng));
+  _branchMaps[branch] = { map, marker, circle };
+  // set initial input values
+  latInput.value = lat.toFixed(6);
+  lngInput.value = lng.toFixed(6);
+}
+
+function refreshGeofenceCircles(){
+  const r = parseInt(document.getElementById('set-radius').value || '300');
+  Object.values(_branchMaps).forEach(o => o.circle.setRadius(r));
+}
+
 async function loadAdminSettings(){
   const s = await loadSettings();
   const set = (id,v) => { const el = document.getElementById(id); if (el) el.value = v||''; };
-  set('set-tripoli-lat', s.branch_tripoli_lat);
-  set('set-tripoli-lng', s.branch_tripoli_lng);
-  set('set-cairo-lat',   s.branch_cairo_lat);
-  set('set-cairo-lng',   s.branch_cairo_lng);
-  set('set-radius',      s.geofence_radius_m);
+  set('set-tripoli-lat', s.branch_tripoli_lat || '32.8872');
+  set('set-tripoli-lng', s.branch_tripoli_lng || '13.1913');
+  set('set-cairo-lat',   s.branch_cairo_lat   || '30.0444');
+  set('set-cairo-lng',   s.branch_cairo_lng   || '31.2357');
+  set('set-radius',      s.geofence_radius_m  || '300');
   document.getElementById('set-enforce').checked = s.geofence_enforce === 'true';
+  // Wait for layout, then init maps
+  setTimeout(() => {
+    setupBranchMap('tripoli', 32.8872, 13.1913);
+    setupBranchMap('cairo',   30.0444, 31.2357);
+  }, 50);
+  // Update circles when radius changes
+  const rEl = document.getElementById('set-radius');
+  rEl.oninput = refreshGeofenceCircles;
 }
 
 async function saveSettings(){
@@ -549,8 +592,15 @@ async function saveSettings(){
 function useMyLocation(branch){
   if (!navigator.geolocation) return alert('GPS غير متاح');
   navigator.geolocation.getCurrentPosition(p => {
-    document.getElementById(`set-${branch}-lat`).value = p.coords.latitude.toFixed(6);
-    document.getElementById(`set-${branch}-lng`).value = p.coords.longitude.toFixed(6);
+    const lat = p.coords.latitude, lng = p.coords.longitude;
+    document.getElementById(`set-${branch}-lat`).value = lat.toFixed(6);
+    document.getElementById(`set-${branch}-lng`).value = lng.toFixed(6);
+    const m = _branchMaps && _branchMaps[branch];
+    if (m){
+      m.marker.setLatLng([lat, lng]);
+      m.circle.setLatLng([lat, lng]);
+      m.map.setView([lat, lng], 17);
+    }
     toast('تم استخدام موقعك','success');
   }, e => alert('فشل تحديد الموقع: '+e.message), { enableHighAccuracy:true });
 }
