@@ -90,9 +90,9 @@
 
 <main class="lg:ms-64 pt-20 lg:pt-6 px-4 lg:px-8 pb-6 max-w-6xl mx-auto lg:mx-0">
   <!-- Top row (desktop 2-col) -->
-  <div class="lg:grid lg:grid-cols-3 lg:gap-6">
+  <div id="dash-grid" class="lg:gap-6">
     <!-- Left/Top: Time & clock -->
-    <div class="lg:col-span-2 space-y-6">
+    <div id="dash-left" class="space-y-6">
       <section class="text-center lg:text-start space-y-1">
         <p id="live-date" class="text-sm font-bold text-secondary uppercase tracking-widest">—</p>
         <h2 id="live-time" class="text-4xl lg:text-6xl font-extrabold text-primary">--:--</h2>
@@ -139,8 +139,8 @@
       </section>
     </div>
 
-    <!-- Right: Live Map -->
-    <div class="mt-6 lg:mt-0 lg:col-span-1 space-y-3">
+    <!-- Right: Live Map (admin only) -->
+    <div id="map-section" class="hidden mt-6 lg:mt-0 lg:col-span-1 space-y-3">
       <div class="flex justify-between items-center px-1">
         <h3 class="text-base font-bold text-primary flex flex-col leading-tight">
           <span>الموقع المباشر</span>

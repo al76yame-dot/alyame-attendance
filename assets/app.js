@@ -238,6 +238,9 @@ async function initDashboard(){
   document.getElementById('user-role').textContent = t('role.'+state.user.role);
   if (state.user.is_admin) {
     const ab = document.getElementById('admin-btn'); if (ab) ab.classList.remove('hidden');
+    const ms = document.getElementById('map-section'); if (ms) ms.classList.remove('hidden');
+    const dg = document.getElementById('dash-grid'); if (dg) dg.classList.add('lg:grid','lg:grid-cols-3');
+    const dl = document.getElementById('dash-left'); if (dl) dl.classList.add('lg:col-span-2');
   }
 
   // Live clock
@@ -255,19 +258,23 @@ async function initDashboard(){
   await loadCurrentLog();
   const pos = await getLocation();
   let map = null, marker = null;
+  const mapEl = document.getElementById('map');
+  const mapVisible = mapEl && state.user.is_admin;
   if (pos) {
     state.location = pos;
     const name = await reverse(pos.lat, pos.lng) || `${pos.lat.toFixed(3)}, ${pos.lng.toFixed(3)}`;
     state.location.name = name;
     locEl.textContent = name;
     verEl.innerHTML = `<span class="text-tertiary font-semibold">${t('verify.ok')}</span>`;
-    map = createMap('map', [pos.lat, pos.lng], 15);
-    marker = L.marker([pos.lat, pos.lng], { icon: pinIcon('#00355f', initials(state.user.name)) }).addTo(map);
-    L.circle([pos.lat, pos.lng], { radius: pos.accuracy||50, color:'#0f4c81', fillColor:'#8ebdf9', fillOpacity:0.15, weight:1 }).addTo(map);
+    if (mapVisible) {
+      map = createMap('map', [pos.lat, pos.lng], 15);
+      marker = L.marker([pos.lat, pos.lng], { icon: pinIcon('#00355f', initials(state.user.name)) }).addTo(map);
+      L.circle([pos.lat, pos.lng], { radius: pos.accuracy||50, color:'#0f4c81', fillColor:'#8ebdf9', fillOpacity:0.15, weight:1 }).addTo(map);
+    }
   } else {
     locEl.textContent = t('verify.fail');
     verEl.innerHTML = `<span class="text-error font-semibold">${t('verify.fail')}</span>`;
-    document.getElementById('map').innerHTML = `<div class="w-full h-full flex items-center justify-center text-outline text-sm">${t('verify.fail')}</div>`;
+    if (mapVisible) mapEl.innerHTML = `<div class="w-full h-full flex items-center justify-center text-outline text-sm">${t('verify.fail')}</div>`;
   }
 
   // Clock button
@@ -366,7 +373,12 @@ async function initHistory(){
   applyLangDir();
   wireCommon();
   document.getElementById('user-initials').textContent = initials(state.user.name);
-  if (state.user.is_admin) document.getElementById('admin-btn')?.classList.remove('hidden');
+  if (state.user.is_admin) {
+    document.getElementById('admin-btn')?.classList.remove('hidden');
+    document.getElementById('map-container')?.classList.remove('hidden');
+    document.getElementById('hist-grid')?.classList.add('lg:grid','lg:grid-cols-3');
+    document.getElementById('hist-left')?.classList.add('lg:col-span-2');
+  }
 
   let filter = 'week';
   document.querySelectorAll('[data-filter]').forEach(b => {
@@ -398,9 +410,9 @@ async function renderHist(filter){
   }
   list.innerHTML = logs.map(histCard).join('');
 
-  // Map
+  // Map (admin only)
   const mapped = logs.filter(l => l.lat_in && l.lng_in);
-  if (mapped.length) {
+  if (mapped.length && state.user.is_admin) {
     document.getElementById('map-container').classList.remove('hidden');
     if (historyMap) historyMap.remove();
     const first = mapped[0];
