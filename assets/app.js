@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.04.25.7';
+const APP_VERSION = '2026.04.25.8';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -352,6 +352,8 @@ async function initDashboard(){
     const btn = document.getElementById('btn-clock'); btn.disabled=true;
     try {
       if (!state.currentLog) {
+        const allowed = await checkGeofence(state.location);
+        if (!allowed) { btn.disabled=false; return; }
         await checkIn(state.location);
         toast(t('toast.in'),'success');
       } else {
@@ -363,8 +365,194 @@ async function initDashboard(){
     btn.disabled=false;
   };
 
+  // Wire request modal + load my requests
+  wireRequestModal();
+  loadMyRequests();
+
   await renderDash();
   setInterval(renderDash, 60000);
+}
+
+// ============= Settings / Geofence =============
+async function loadSettings(){
+  const rows = await sb('att_settings?select=key,value');
+  const map = {};
+  (rows||[]).forEach(r => map[r.key] = r.value);
+  return map;
+}
+
+function distMeters(lat1,lng1,lat2,lng2){
+  const R = 6371000;
+  const toRad = d => d*Math.PI/180;
+  const dLat = toRad(lat2-lat1), dLng = toRad(lng2-lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+async function checkGeofence(loc){
+  const s = await loadSettings();
+  if (s.geofence_enforce !== 'true') return true;
+  if (!loc || !loc.lat) { alert('لا يمكن تسجيل الحضور بدون موقع GPS'); return false; }
+  const radius = parseInt(s.geofence_radius_m || '300');
+  const branches = [
+    { name:s.branch_tripoli_name||'طرابلس', lat:parseFloat(s.branch_tripoli_lat), lng:parseFloat(s.branch_tripoli_lng) },
+    { name:s.branch_cairo_name||'القاهرة',  lat:parseFloat(s.branch_cairo_lat),   lng:parseFloat(s.branch_cairo_lng)   }
+  ].filter(b => !isNaN(b.lat) && !isNaN(b.lng));
+  for (const b of branches){
+    const d = distMeters(loc.lat, loc.lng, b.lat, b.lng);
+    if (d <= radius) return true;
+  }
+  const closest = branches.map(b => ({ b, d: distMeters(loc.lat,loc.lng,b.lat,b.lng) })).sort((a,b)=>a.d-b.d)[0];
+  alert(`أنت خارج نطاق المكتب.\nأقرب مكتب: ${closest?.b.name} (${Math.round(closest?.d||0)} م)\nالنطاق المسموح: ${radius} م`);
+  return false;
+}
+
+// ============= Employee Requests =============
+function wireRequestModal(){
+  const btn = document.getElementById('btn-new-request');
+  if (!btn) return;
+  btn.onclick = () => {
+    document.getElementById('rq-from').value = new Date().toISOString().slice(0,10);
+    document.getElementById('rq-to').value = '';
+    document.getElementById('rq-reason').value = '';
+    document.getElementById('rq-type').value = 'leave';
+    document.getElementById('rq-time-row').classList.add('hidden');
+    document.getElementById('req-modal').classList.remove('hidden');
+  };
+  document.getElementById('rq-type').onchange = (e) => {
+    document.getElementById('rq-time-row').classList.toggle('hidden', e.target.value !== 'permission');
+  };
+  document.getElementById('req-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const type = document.getElementById('rq-type').value;
+    const body = {
+      employee_id: state.user.id,
+      type,
+      start_date: document.getElementById('rq-from').value,
+      end_date: document.getElementById('rq-to').value || null,
+      start_time: type==='permission' ? (document.getElementById('rq-from-t').value||null) : null,
+      end_time:   type==='permission' ? (document.getElementById('rq-to-t').value||null)   : null,
+      reason: document.getElementById('rq-reason').value || null,
+      status: 'pending'
+    };
+    try {
+      await sb('att_requests', { method:'POST', body });
+      document.getElementById('req-modal').classList.add('hidden');
+      toast('تم إرسال الطلب','success');
+      loadMyRequests();
+    } catch(err){ toast('فشل الإرسال: '+err.message,'error'); }
+  };
+}
+
+async function loadMyRequests(){
+  const list = document.getElementById('my-requests');
+  if (!list) return;
+  const rows = await sb(`att_requests?employee_id=eq.${state.user.id}&order=created_at.desc&limit=20`);
+  if (!rows || !rows.length) { list.innerHTML = `<div class="p-6 text-center bg-white rounded-2xl border border-dashed text-outline col-span-full">لا توجد طلبات</div>`; return; }
+  list.innerHTML = rows.map(r => {
+    const statColor = r.status==='approved'?'bg-tertiary-fixed text-tertiary':r.status==='rejected'?'bg-error-container text-error':'bg-secondary-fixed text-secondary';
+    const statText = r.status==='approved'?'مقبول':r.status==='rejected'?'مرفوض':'قيد الانتظار';
+    const typeText = r.type==='leave'?'إجازة':'إذن';
+    return `<div class="p-4 bg-white rounded-2xl border border-outline-variant/30">
+      <div class="flex items-center justify-between mb-1">
+        <span class="font-bold text-primary">${typeText}</span>
+        <span class="px-2 py-1 rounded-full text-xs font-bold ${statColor}">${statText}</span>
+      </div>
+      <p class="text-xs text-outline">${r.start_date}${r.end_date?' → '+r.end_date:''}</p>
+      ${r.reason?`<p class="text-sm mt-1">${r.reason}</p>`:''}
+      ${r.admin_note?`<p class="text-xs mt-2 p-2 bg-surface-container-low rounded">رد المدير: ${r.admin_note}</p>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ============= Admin: Requests management =============
+async function loadAdminRequests(filter='pending'){
+  const list = document.getElementById('requests-list');
+  let q = 'att_requests?order=created_at.desc&select=*,att_employees(name,phone,role)';
+  if (filter !== 'all') q += `&status=eq.${filter}`;
+  const rows = await sb(q);
+  window._adminReqs = rows;
+  if (!rows || !rows.length){ list.innerHTML = `<div class="p-10 text-center bg-white rounded-2xl border border-dashed text-outline col-span-full">لا توجد طلبات</div>`; return; }
+  list.innerHTML = rows.map(r => {
+    const e = r.att_employees||{};
+    const typeText = r.type==='leave'?'إجازة':'إذن';
+    const statColor = r.status==='approved'?'bg-tertiary-fixed text-tertiary':r.status==='rejected'?'bg-error-container text-error':'bg-secondary-fixed text-secondary';
+    const statText = r.status==='approved'?'مقبول':r.status==='rejected'?'مرفوض':'قيد الانتظار';
+    const actions = r.status==='pending' ? `
+      <div class="flex gap-2 mt-3">
+        <button onclick="App.decideRequest('${r.id}','approved')" class="flex-1 h-10 bg-tertiary text-white font-bold rounded-lg text-sm">قبول</button>
+        <button onclick="App.decideRequest('${r.id}','rejected')" class="flex-1 h-10 bg-error-container text-error font-bold rounded-lg text-sm">رفض</button>
+      </div>` : '';
+    return `<div class="p-4 bg-white rounded-2xl border border-outline-variant/30">
+      <div class="flex items-center justify-between mb-1">
+        <div>
+          <p class="font-bold text-primary">${e.name||'—'}</p>
+          <p class="text-xs text-outline">${typeText} · ${r.start_date}${r.end_date?' → '+r.end_date:''}</p>
+        </div>
+        <span class="px-2 py-1 rounded-full text-xs font-bold ${statColor}">${statText}</span>
+      </div>
+      ${r.start_time?`<p class="text-xs text-outline">${r.start_time} - ${r.end_time||''}</p>`:''}
+      ${r.reason?`<p class="text-sm mt-2">${r.reason}</p>`:''}
+      ${actions}
+    </div>`;
+  }).join('');
+}
+
+async function decideRequest(id, status){
+  const note = status==='rejected' ? (prompt('سبب الرفض (اختياري):')||null) : null;
+  await sb(`att_requests?id=eq.${id}`, { method:'PATCH', body:{
+    status, admin_note: note, decided_by: state.user.id, decided_at: new Date().toISOString()
+  }});
+  await loadAdminRequests(window._reqFilter||'pending');
+  await refreshPendingBadge();
+}
+
+async function refreshPendingBadge(){
+  const r = await sb('att_requests?status=eq.pending&select=id');
+  const badge = document.getElementById('req-pending-badge');
+  if (!badge) return;
+  if (r && r.length) { badge.textContent = r.length; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
+}
+
+// ============= Admin: Settings =============
+async function loadAdminSettings(){
+  const s = await loadSettings();
+  const set = (id,v) => { const el = document.getElementById(id); if (el) el.value = v||''; };
+  set('set-tripoli-lat', s.branch_tripoli_lat);
+  set('set-tripoli-lng', s.branch_tripoli_lng);
+  set('set-cairo-lat',   s.branch_cairo_lat);
+  set('set-cairo-lng',   s.branch_cairo_lng);
+  set('set-radius',      s.geofence_radius_m);
+  document.getElementById('set-enforce').checked = s.geofence_enforce === 'true';
+}
+
+async function saveSettings(){
+  const upserts = [
+    { key:'branch_tripoli_lat', value:document.getElementById('set-tripoli-lat').value },
+    { key:'branch_tripoli_lng', value:document.getElementById('set-tripoli-lng').value },
+    { key:'branch_cairo_lat',   value:document.getElementById('set-cairo-lat').value },
+    { key:'branch_cairo_lng',   value:document.getElementById('set-cairo-lng').value },
+    { key:'geofence_radius_m',  value:document.getElementById('set-radius').value || '300' },
+    { key:'geofence_enforce',   value:document.getElementById('set-enforce').checked ? 'true':'false' }
+  ];
+  try {
+    await sb('att_settings', {
+      method:'POST',
+      headers:{ 'Prefer':'resolution=merge-duplicates,return=minimal' },
+      body: upserts
+    });
+    toast('تم الحفظ','success');
+  } catch(e){ toast('فشل: '+e.message,'error'); }
+}
+
+function useMyLocation(branch){
+  if (!navigator.geolocation) return alert('GPS غير متاح');
+  navigator.geolocation.getCurrentPosition(p => {
+    document.getElementById(`set-${branch}-lat`).value = p.coords.latitude.toFixed(6);
+    document.getElementById(`set-${branch}-lng`).value = p.coords.longitude.toFixed(6);
+    toast('تم استخدام موقعك','success');
+  }, e => alert('فشل تحديد الموقع: '+e.message), { enableHighAccuracy:true });
 }
 
 async function renderDash(){
@@ -601,7 +789,21 @@ async function initAdmin(){
   const lf = document.getElementById('log-form');
   if (lf) lf.onsubmit = saveLog;
 
+  // Wire request filter buttons
+  document.querySelectorAll('[data-rfilter]').forEach(b => {
+    b.onclick = () => {
+      window._reqFilter = b.dataset.rfilter;
+      document.querySelectorAll('[data-rfilter]').forEach(x => {
+        const a = x.dataset.rfilter === b.dataset.rfilter;
+        x.classList.toggle('bg-primary', a); x.classList.toggle('text-white', a);
+        x.classList.toggle('bg-surface-container', !a);
+      });
+      loadAdminRequests(b.dataset.rfilter);
+    };
+  });
+
   await refreshStats();
+  await refreshPendingBadge();
   switchTab('employees');
 }
 
@@ -616,6 +818,8 @@ function switchTab(tab){
   if (tab==='employees') loadEmployees();
   if (tab==='logs') loadAllLogs();
   if (tab==='livemap') loadLiveMap();
+  if (tab==='requests') loadAdminRequests(window._reqFilter||'pending');
+  if (tab==='settings') loadAdminSettings();
 }
 
 async function refreshStats(){
@@ -879,5 +1083,5 @@ function wireCommon(){
   });
 }
 
-window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, state };
+window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, state };
 })();

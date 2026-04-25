@@ -156,6 +156,70 @@
     </div>
   </div>
 
+  <!-- Request leave / permission -->
+  <section class="mt-6">
+    <div class="flex items-center gap-3 mb-3 px-1">
+      <h3 class="text-base font-bold text-primary flex flex-col leading-tight">
+        <span>طلباتي</span>
+        <span class="text-xs font-medium opacity-70">My Requests</span>
+      </h3>
+      <button id="btn-new-request" class="ms-auto px-4 py-2 bg-secondary-container text-white font-semibold rounded-xl flex items-center gap-1 active:scale-95">
+        <span class="material-symbols-outlined text-[18px]">add</span>
+        <span>طلب جديد / New</span>
+      </button>
+    </div>
+    <div id="my-requests" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+  </section>
+
+  <!-- Request Modal -->
+  <div id="req-modal" class="hidden fixed inset-0 z-[100] flex items-end lg:items-center justify-center p-0 lg:p-6 bg-black/50 backdrop-blur-sm">
+    <div class="bg-white w-full lg:max-w-md rounded-t-3xl lg:rounded-3xl max-h-[90vh] overflow-y-auto">
+      <div class="sticky top-0 bg-white flex justify-between items-center p-5 border-b border-outline-variant/30">
+        <h3 class="text-lg font-bold text-primary">طلب جديد / New Request</h3>
+        <button onclick="document.getElementById('req-modal').classList.add('hidden')" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <form id="req-form" class="p-5 space-y-4">
+        <div>
+          <label class="text-sm font-semibold mb-1 block">نوع الطلب / Type</label>
+          <select id="rq-type" class="w-full h-12 px-3 bg-white border border-outline-variant rounded-xl">
+            <option value="leave">إجازة / Leave</option>
+            <option value="permission">إذن / Permission</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-sm font-semibold mb-1 block">من / From</label>
+            <input id="rq-from" type="date" required class="w-full h-12 px-3 bg-white border border-outline-variant rounded-xl"/>
+          </div>
+          <div>
+            <label class="text-sm font-semibold mb-1 block">إلى / To</label>
+            <input id="rq-to" type="date" class="w-full h-12 px-3 bg-white border border-outline-variant rounded-xl"/>
+          </div>
+        </div>
+        <div id="rq-time-row" class="grid grid-cols-2 gap-3 hidden">
+          <div>
+            <label class="text-sm font-semibold mb-1 block">من الساعة</label>
+            <input id="rq-from-t" type="time" class="w-full h-12 px-3 bg-white border border-outline-variant rounded-xl"/>
+          </div>
+          <div>
+            <label class="text-sm font-semibold mb-1 block">إلى الساعة</label>
+            <input id="rq-to-t" type="time" class="w-full h-12 px-3 bg-white border border-outline-variant rounded-xl"/>
+          </div>
+        </div>
+        <div>
+          <label class="text-sm font-semibold mb-1 block">السبب / Reason</label>
+          <textarea id="rq-reason" rows="3" class="w-full p-3 bg-white border border-outline-variant rounded-xl" placeholder="اكتب السبب..."></textarea>
+        </div>
+        <div class="flex gap-2 pt-3 border-t border-outline-variant/30">
+          <button type="button" onclick="document.getElementById('req-modal').classList.add('hidden')" class="flex-1 h-12 bg-surface-container font-semibold rounded-xl">إلغاء</button>
+          <button type="submit" class="flex-1 h-12 bg-primary text-white font-bold rounded-xl">إرسال</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Recent -->
   <section class="mt-6 space-y-4">
     <div class="flex justify-between items-center px-1">
@@ -188,7 +252,7 @@
   </a>
 </nav>
 
-<script src="assets/app.js?v=2026.04.25.6"></script>
+<script src="assets/app.js?v=2026.04.25.8"></script>
 <script>App.initDashboard();</script>
 </body>
 </html>

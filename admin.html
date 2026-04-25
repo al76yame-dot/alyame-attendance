@@ -127,6 +127,15 @@
       <span class="material-symbols-outlined text-[18px]">map</span>
       <span data-i18n="admin.livemap">خريطة حية</span>
     </button>
+    <button data-tab="requests" class="px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap bg-surface-container text-on-surface-variant flex items-center gap-1.5">
+      <span class="material-symbols-outlined text-[18px]">event_available</span>
+      <span>الطلبات</span>
+      <span id="req-pending-badge" class="hidden ms-1 px-1.5 py-0.5 bg-error text-white text-[10px] rounded-full">0</span>
+    </button>
+    <button data-tab="settings" class="px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap bg-surface-container text-on-surface-variant flex items-center gap-1.5">
+      <span class="material-symbols-outlined text-[18px]">settings</span>
+      <span>الإعدادات</span>
+    </button>
   </div>
 
   <!-- Employees tab -->
@@ -160,6 +169,61 @@
     <div class="h-96 rounded-3xl overflow-hidden border border-outline-variant/50 shadow-sm bg-surface-container">
       <div id="livemap"></div>
     </div>
+  </section>
+
+  <!-- Requests tab -->
+  <section data-tabpane="requests" class="hidden space-y-3">
+    <div class="flex gap-2 overflow-x-auto pb-2">
+      <button data-rfilter="pending" class="px-3 py-1.5 rounded-full font-semibold text-sm bg-primary text-white">قيد الانتظار</button>
+      <button data-rfilter="approved" class="px-3 py-1.5 rounded-full font-semibold text-sm bg-surface-container">مقبولة</button>
+      <button data-rfilter="rejected" class="px-3 py-1.5 rounded-full font-semibold text-sm bg-surface-container">مرفوضة</button>
+      <button data-rfilter="all" class="px-3 py-1.5 rounded-full font-semibold text-sm bg-surface-container">الكل</button>
+    </div>
+    <div id="requests-list" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+  </section>
+
+  <!-- Settings tab -->
+  <section data-tabpane="settings" class="hidden space-y-4">
+    <h3 class="text-lg font-bold text-primary">إعدادات الموقع / Location Settings</h3>
+    <p class="text-sm text-on-surface-variant">حدد موقع كل فرع — لن يستطيع الموظف تسجيل الحضور إلا داخل النطاق المحدد إذا فعّلت الفرض الإلزامي.</p>
+
+    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30 space-y-3">
+      <div class="flex items-center gap-2">
+        <span class="text-2xl">🇱🇾</span>
+        <h4 class="font-bold">مكتب طرابلس / Tripoli Office</h4>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-xs">خط العرض (lat)</label><input id="set-tripoli-lat" type="number" step="any" class="w-full h-11 px-3 border rounded-lg" dir="ltr"/></div>
+        <div><label class="text-xs">خط الطول (lng)</label><input id="set-tripoli-lng" type="number" step="any" class="w-full h-11 px-3 border rounded-lg" dir="ltr"/></div>
+      </div>
+      <button onclick="App.useMyLocation('tripoli')" class="text-xs text-primary font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">my_location</span>استخدم موقعي الحالي</button>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30 space-y-3">
+      <div class="flex items-center gap-2">
+        <span class="text-2xl">🇪🇬</span>
+        <h4 class="font-bold">مكتب القاهرة / Cairo Office</h4>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-xs">خط العرض (lat)</label><input id="set-cairo-lat" type="number" step="any" class="w-full h-11 px-3 border rounded-lg" dir="ltr"/></div>
+        <div><label class="text-xs">خط الطول (lng)</label><input id="set-cairo-lng" type="number" step="any" class="w-full h-11 px-3 border rounded-lg" dir="ltr"/></div>
+      </div>
+      <button onclick="App.useMyLocation('cairo')" class="text-xs text-primary font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">my_location</span>استخدم موقعي الحالي</button>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30 space-y-3">
+      <h4 class="font-bold">النطاق المسموح / Allowed Radius</h4>
+      <div>
+        <label class="text-xs">نصف القطر بالأمتار (مثلاً 300)</label>
+        <input id="set-radius" type="number" min="50" max="5000" class="w-full h-11 px-3 border rounded-lg" dir="ltr"/>
+      </div>
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input id="set-enforce" type="checkbox" class="w-5 h-5"/>
+        <span class="text-sm font-semibold">فرض الموقع — منع التسجيل خارج النطاق</span>
+      </label>
+    </div>
+
+    <button onclick="App.saveSettings()" class="w-full h-12 bg-primary text-white font-bold rounded-xl">حفظ الإعدادات</button>
   </section>
 </main>
 
@@ -290,7 +354,7 @@
   </a>
 </nav>
 
-<script src="assets/app.js?v=2026.04.25.6"></script>
+<script src="assets/app.js?v=2026.04.25.8"></script>
 <script>App.initAdmin();</script>
 </body>
 </html>
