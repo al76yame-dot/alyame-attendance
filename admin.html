@@ -201,6 +201,20 @@
         <div><label class="text-xs">lng</label><input id="set-tripoli-lng" type="number" step="any" readonly class="w-full h-10 px-2 border rounded-lg bg-surface-container-low text-xs" dir="ltr"/></div>
         <button type="button" onclick="App.useMyLocation('tripoli')" class="h-10 bg-primary-fixed text-primary font-bold rounded-lg text-xs flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[16px]">my_location</span>موقعي</button>
       </div>
+      <div class="grid grid-cols-3 gap-2 items-end pt-2 border-t border-outline-variant/30">
+        <div>
+          <label class="text-xs">النطاق (متر)</label>
+          <input id="set-tripoli-radius" type="number" min="50" max="5000" class="w-full h-10 px-2 border rounded-lg text-xs" dir="ltr"/>
+        </div>
+        <div>
+          <label class="text-xs">بداية الدوام</label>
+          <input id="set-tripoli-start" type="time" class="w-full h-10 px-2 border rounded-lg text-xs" dir="ltr"/>
+        </div>
+        <div>
+          <label class="text-xs">نهاية الدوام</label>
+          <input id="set-tripoli-end" type="time" class="w-full h-10 px-2 border rounded-lg text-xs" dir="ltr"/>
+        </div>
+      </div>
     </div>
 
     <div class="bg-white p-4 rounded-2xl border border-outline-variant/30 space-y-3">
@@ -217,17 +231,26 @@
         <div><label class="text-xs">lng</label><input id="set-cairo-lng" type="number" step="any" readonly class="w-full h-10 px-2 border rounded-lg bg-surface-container-low text-xs" dir="ltr"/></div>
         <button type="button" onclick="App.useMyLocation('cairo')" class="h-10 bg-primary-fixed text-primary font-bold rounded-lg text-xs flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[16px]">my_location</span>موقعي</button>
       </div>
+      <div class="grid grid-cols-3 gap-2 items-end pt-2 border-t border-outline-variant/30">
+        <div>
+          <label class="text-xs">النطاق (متر)</label>
+          <input id="set-cairo-radius" type="number" min="50" max="5000" class="w-full h-10 px-2 border rounded-lg text-xs" dir="ltr"/>
+        </div>
+        <div>
+          <label class="text-xs">بداية الدوام</label>
+          <input id="set-cairo-start" type="time" class="w-full h-10 px-2 border rounded-lg text-xs" dir="ltr"/>
+        </div>
+        <div>
+          <label class="text-xs">نهاية الدوام</label>
+          <input id="set-cairo-end" type="time" class="w-full h-10 px-2 border rounded-lg text-xs" dir="ltr"/>
+        </div>
+      </div>
     </div>
 
-    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30 space-y-3">
-      <h4 class="font-bold">النطاق المسموح / Allowed Radius</h4>
-      <div>
-        <label class="text-xs">نصف القطر بالأمتار (مثلاً 300)</label>
-        <input id="set-radius" type="number" min="50" max="5000" class="w-full h-11 px-3 border rounded-lg" dir="ltr"/>
-      </div>
+    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30">
       <label class="flex items-center gap-3 cursor-pointer">
         <input id="set-enforce" type="checkbox" class="w-5 h-5"/>
-        <span class="text-sm font-semibold">فرض الموقع — منع التسجيل خارج النطاق</span>
+        <span class="text-sm font-semibold">فرض الموقع — منع التسجيل خارج نطاق المكتب</span>
       </label>
     </div>
 
@@ -362,7 +385,7 @@
   </a>
 </nav>
 
-<script src="assets/app.js?v=2026.04.25.9"></script>
+<script src="assets/app.js?v=2026.04.25.10"></script>
 <script>App.initAdmin();</script>
 </body>
 </html>

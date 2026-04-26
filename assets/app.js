@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.04.25.9';
+const APP_VERSION = '2026.04.25.10';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -365,9 +365,10 @@ async function initDashboard(){
     btn.disabled=false;
   };
 
-  // Wire request modal + load my requests
+  // Wire request modal + load my requests + show shift
   wireRequestModal();
   loadMyRequests();
+  showShiftInfo();
 
   await renderDash();
   setInterval(renderDash, 60000);
@@ -389,22 +390,63 @@ function distMeters(lat1,lng1,lat2,lng2){
   return 2*R*Math.asin(Math.sqrt(a));
 }
 
+function branchesFromSettings(s){
+  return [
+    { key:'tripoli', name:s.branch_tripoli_name||'طرابلس',
+      lat:parseFloat(s.branch_tripoli_lat), lng:parseFloat(s.branch_tripoli_lng),
+      radius:parseInt(s.branch_tripoli_radius_m || s.geofence_radius_m || '300'),
+      start:s.branch_tripoli_start||'08:00', end:s.branch_tripoli_end||'17:00' },
+    { key:'cairo', name:s.branch_cairo_name||'القاهرة',
+      lat:parseFloat(s.branch_cairo_lat), lng:parseFloat(s.branch_cairo_lng),
+      radius:parseInt(s.branch_cairo_radius_m || s.geofence_radius_m || '300'),
+      start:s.branch_cairo_start||'09:00', end:s.branch_cairo_end||'17:00' }
+  ];
+}
+
 async function checkGeofence(loc){
   const s = await loadSettings();
   if (s.geofence_enforce !== 'true') return true;
   if (!loc || !loc.lat) { alert('لا يمكن تسجيل الحضور بدون موقع GPS'); return false; }
-  const radius = parseInt(s.geofence_radius_m || '300');
-  const branches = [
-    { name:s.branch_tripoli_name||'طرابلس', lat:parseFloat(s.branch_tripoli_lat), lng:parseFloat(s.branch_tripoli_lng) },
-    { name:s.branch_cairo_name||'القاهرة',  lat:parseFloat(s.branch_cairo_lat),   lng:parseFloat(s.branch_cairo_lng)   }
-  ].filter(b => !isNaN(b.lat) && !isNaN(b.lng));
+  const branches = branchesFromSettings(s).filter(b => !isNaN(b.lat) && !isNaN(b.lng));
   for (const b of branches){
     const d = distMeters(loc.lat, loc.lng, b.lat, b.lng);
-    if (d <= radius) return true;
+    if (d <= b.radius) return true;
   }
   const closest = branches.map(b => ({ b, d: distMeters(loc.lat,loc.lng,b.lat,b.lng) })).sort((a,b)=>a.d-b.d)[0];
-  alert(`أنت خارج نطاق المكتب.\nأقرب مكتب: ${closest?.b.name} (${Math.round(closest?.d||0)} م)\nالنطاق المسموح: ${radius} م`);
+  if (closest) alert(`أنت خارج نطاق المكتب.\nأقرب مكتب: ${closest.b.name} (${Math.round(closest.d)} م)\nالنطاق المسموح: ${closest.b.radius} م`);
   return false;
+}
+
+function detectUserBranch(branches, loc, userBranchText){
+  // 1) match by current location (closest within radius)
+  if (loc && loc.lat){
+    const inside = branches
+      .filter(b => !isNaN(b.lat))
+      .map(b => ({ b, d: distMeters(loc.lat,loc.lng,b.lat,b.lng) }))
+      .filter(x => x.d <= x.b.radius)
+      .sort((a,b)=>a.d-b.d);
+    if (inside.length) return inside[0].b;
+  }
+  // 2) match by branch text
+  const t = (userBranchText||'').toLowerCase();
+  if (t.includes('طرابلس') || t.includes('tripoli') || t.includes('libya') || t.includes('ليبيا')) return branches[0];
+  if (t.includes('قاهرة') || t.includes('cairo') || t.includes('egypt') || t.includes('مصر')) return branches[1];
+  return branches[0];
+}
+
+async function showShiftInfo(){
+  const el = document.getElementById('shift-info');
+  if (!el) return;
+  try {
+    const s = await loadSettings();
+    const branches = branchesFromSettings(s);
+    const b = detectUserBranch(branches, state.location, state.user.branch);
+    if (!b) return;
+    document.getElementById('shift-start').textContent = b.start;
+    document.getElementById('shift-end').textContent = b.end;
+    document.getElementById('shift-branch').textContent = '· ' + b.name;
+    el.classList.remove('hidden');
+  } catch(_){}
 }
 
 // ============= Employee Requests =============
@@ -522,14 +564,14 @@ function setupBranchMap(branch, defaultLat, defaultLng){
   const containerId = `map-${branch}`;
   const el = document.getElementById(containerId);
   if (!el) return;
-  // tear down old instance if switching tabs
   if (_branchMaps[branch]) { _branchMaps[branch].map.remove(); delete _branchMaps[branch]; }
   const latInput = document.getElementById(`set-${branch}-lat`);
   const lngInput = document.getElementById(`set-${branch}-lng`);
+  const radiusInput = document.getElementById(`set-${branch}-radius`);
   const lat = parseFloat(latInput.value) || defaultLat;
   const lng = parseFloat(lngInput.value) || defaultLng;
   const map = createMap(containerId, [lat, lng], 16);
-  const radius = parseInt(document.getElementById('set-radius').value || '300');
+  const radius = parseInt(radiusInput.value || '300');
   const marker = L.marker([lat, lng], { draggable: true, icon: pinIcon('#00355f','📍') }).addTo(map);
   const circle = L.circle([lat, lng], { radius, color:'#00355f', fillColor:'#8ebdf9', fillOpacity:0.2, weight:2 }).addTo(map);
   const update = (latlng) => {
@@ -540,44 +582,50 @@ function setupBranchMap(branch, defaultLat, defaultLng){
   };
   marker.on('dragend', e => update(e.target.getLatLng()));
   map.on('click', e => update(e.latlng));
-  _branchMaps[branch] = { map, marker, circle };
-  // set initial input values
+  radiusInput.oninput = () => {
+    const r = parseInt(radiusInput.value || '300');
+    circle.setRadius(r);
+  };
+  _branchMaps[branch] = { map, marker, circle, radiusInput };
   latInput.value = lat.toFixed(6);
   lngInput.value = lng.toFixed(6);
-}
-
-function refreshGeofenceCircles(){
-  const r = parseInt(document.getElementById('set-radius').value || '300');
-  Object.values(_branchMaps).forEach(o => o.circle.setRadius(r));
 }
 
 async function loadAdminSettings(){
   const s = await loadSettings();
   const set = (id,v) => { const el = document.getElementById(id); if (el) el.value = v||''; };
-  set('set-tripoli-lat', s.branch_tripoli_lat || '32.8872');
-  set('set-tripoli-lng', s.branch_tripoli_lng || '13.1913');
-  set('set-cairo-lat',   s.branch_cairo_lat   || '30.0444');
-  set('set-cairo-lng',   s.branch_cairo_lng   || '31.2357');
-  set('set-radius',      s.geofence_radius_m  || '300');
+  const oldRadius = s.geofence_radius_m || '300';
+  set('set-tripoli-lat',    s.branch_tripoli_lat    || '32.8872');
+  set('set-tripoli-lng',    s.branch_tripoli_lng    || '13.1913');
+  set('set-tripoli-radius', s.branch_tripoli_radius_m || oldRadius);
+  set('set-tripoli-start',  s.branch_tripoli_start  || '08:00');
+  set('set-tripoli-end',    s.branch_tripoli_end    || '17:00');
+  set('set-cairo-lat',      s.branch_cairo_lat      || '30.0444');
+  set('set-cairo-lng',      s.branch_cairo_lng      || '31.2357');
+  set('set-cairo-radius',   s.branch_cairo_radius_m || oldRadius);
+  set('set-cairo-start',    s.branch_cairo_start    || '09:00');
+  set('set-cairo-end',      s.branch_cairo_end      || '17:00');
   document.getElementById('set-enforce').checked = s.geofence_enforce === 'true';
-  // Wait for layout, then init maps
   setTimeout(() => {
     setupBranchMap('tripoli', 32.8872, 13.1913);
     setupBranchMap('cairo',   30.0444, 31.2357);
   }, 50);
-  // Update circles when radius changes
-  const rEl = document.getElementById('set-radius');
-  rEl.oninput = refreshGeofenceCircles;
 }
 
 async function saveSettings(){
+  const v = id => document.getElementById(id).value;
   const upserts = [
-    { key:'branch_tripoli_lat', value:document.getElementById('set-tripoli-lat').value },
-    { key:'branch_tripoli_lng', value:document.getElementById('set-tripoli-lng').value },
-    { key:'branch_cairo_lat',   value:document.getElementById('set-cairo-lat').value },
-    { key:'branch_cairo_lng',   value:document.getElementById('set-cairo-lng').value },
-    { key:'geofence_radius_m',  value:document.getElementById('set-radius').value || '300' },
-    { key:'geofence_enforce',   value:document.getElementById('set-enforce').checked ? 'true':'false' }
+    { key:'branch_tripoli_lat',      value:v('set-tripoli-lat') },
+    { key:'branch_tripoli_lng',      value:v('set-tripoli-lng') },
+    { key:'branch_tripoli_radius_m', value:v('set-tripoli-radius') || '300' },
+    { key:'branch_tripoli_start',    value:v('set-tripoli-start') || '08:00' },
+    { key:'branch_tripoli_end',      value:v('set-tripoli-end')   || '17:00' },
+    { key:'branch_cairo_lat',        value:v('set-cairo-lat') },
+    { key:'branch_cairo_lng',        value:v('set-cairo-lng') },
+    { key:'branch_cairo_radius_m',   value:v('set-cairo-radius') || '300' },
+    { key:'branch_cairo_start',      value:v('set-cairo-start') || '09:00' },
+    { key:'branch_cairo_end',        value:v('set-cairo-end')   || '17:00' },
+    { key:'geofence_enforce',        value:document.getElementById('set-enforce').checked ? 'true':'false' }
   ];
   try {
     await sb('att_settings', {

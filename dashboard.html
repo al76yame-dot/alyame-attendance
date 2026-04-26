@@ -100,6 +100,14 @@
           <span class="material-symbols-outlined text-[18px]">location_on</span>
           <span id="live-location" class="text-sm">جاري تحديد الموقع...</span>
         </div>
+        <div id="shift-info" class="hidden mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-primary-fixed text-primary rounded-full text-xs font-bold">
+          <span class="material-symbols-outlined text-[16px]">schedule</span>
+          <span>دوام اليوم:</span>
+          <span id="shift-start">--:--</span>
+          <span>→</span>
+          <span id="shift-end">--:--</span>
+          <span class="opacity-70" id="shift-branch"></span>
+        </div>
       </section>
 
       <!-- Big clock card -->
@@ -252,7 +260,7 @@
   </a>
 </nav>
 
-<script src="assets/app.js?v=2026.04.25.9"></script>
+<script src="assets/app.js?v=2026.04.25.10"></script>
 <script>App.initDashboard();</script>
 </body>
 </html>
