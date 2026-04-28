@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.04.25.12';
+const APP_VERSION = '2026.04.25.13';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -379,7 +379,7 @@ async function initDashboard(){
   loadMyRequests();
   showShiftInfo();
   showCareBanner();
-  ensureNotifyPermission();
+  ensureNotifyPermission().then(ok => { if (ok) subscribeToPush(); });
   runShiftAlerts();
   setInterval(runShiftAlerts, 60000);
 
@@ -445,6 +445,64 @@ function detectUserBranch(branches, loc, userBranchText){
   if (t.includes('طرابلس') || t.includes('tripoli') || t.includes('libya') || t.includes('ليبيا')) return branches[0];
   if (t.includes('قاهرة') || t.includes('cairo') || t.includes('egypt') || t.includes('مصر')) return branches[1];
   return branches[0];
+}
+
+// ============= Web Push subscription =============
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g,'+').replace(/_/g,'/');
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i=0;i<raw.length;i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+async function subscribeToPush(){
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    const s = await loadSettings();
+    const vapid = s.vapid_public_key;
+    if (!vapid) return; // not configured yet
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapid)
+      });
+    }
+    const json = sub.toJSON();
+    const body = {
+      employee_id: state.user.id,
+      endpoint: json.endpoint,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth,
+      user_agent: navigator.userAgent.slice(0,200)
+    };
+    // upsert by endpoint
+    await sb('att_push_subs?on_conflict=endpoint', {
+      method:'POST',
+      headers:{ 'Prefer':'resolution=merge-duplicates,return=minimal' },
+      body
+    });
+  } catch(e){ console.warn('push subscribe failed', e); }
+}
+
+async function sendBroadcastPush(title, body, employee_ids){
+  // Calls the Edge Function send-push
+  const url = `${SB_URL}/functions/v1/send-push`;
+  const r = await fetch(url, {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':'Bearer '+SB_KEY,
+      'apikey':SB_KEY
+    },
+    body: JSON.stringify({ title, body, employee_ids: employee_ids||null })
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
 }
 
 // ============= Notifications / Alerts / Auto-checkout =============
@@ -727,6 +785,7 @@ async function loadAdminSettings(){
   set('set-cairo-start',    s.branch_cairo_start    || '09:00');
   set('set-cairo-end',      s.branch_cairo_end      || '17:00');
   document.getElementById('set-enforce').checked = s.geofence_enforce === 'true';
+  set('set-vapid', s.vapid_public_key || '');
   set('set-care-title', s.care_title || '');
   document.getElementById('set-care-msg').value = s.care_msg || '';
   document.getElementById('set-care-active').checked = s.care_active === 'true';
@@ -752,7 +811,8 @@ async function saveSettings(){
     { key:'geofence_enforce',        value:document.getElementById('set-enforce').checked ? 'true':'false' },
     { key:'care_title',              value:v('set-care-title') || '' },
     { key:'care_msg',                value:document.getElementById('set-care-msg').value || '' },
-    { key:'care_active',             value:document.getElementById('set-care-active').checked ? 'true':'false' }
+    { key:'care_active',             value:document.getElementById('set-care-active').checked ? 'true':'false' },
+    { key:'vapid_public_key',        value:v('set-vapid') || '' }
   ];
   try {
     await sb('att_settings', {
@@ -762,6 +822,18 @@ async function saveSettings(){
     });
     toast('تم الحفظ','success');
   } catch(e){ toast('فشل: '+e.message,'error'); }
+}
+
+async function sendPushNow(){
+  const title = document.getElementById('push-title').value.trim();
+  const body  = document.getElementById('push-body').value.trim();
+  if (!title) return alert('اكتب عنوان الإشعار');
+  try {
+    const r = await sendBroadcastPush(title, body);
+    alert(`✅ تم الإرسال — أرسل إلى ${r.sent} من أصل ${r.total} مشترك`);
+    document.getElementById('push-title').value = '';
+    document.getElementById('push-body').value = '';
+  } catch(e){ alert('فشل: '+e.message); }
 }
 
 function useMyLocation(branch){
@@ -1308,5 +1380,5 @@ function wireCommon(){
   });
 }
 
-window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, state };
+window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, sendPushNow, state };
 })();
