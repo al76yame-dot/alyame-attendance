@@ -89,6 +89,20 @@
 </header>
 
 <main class="lg:ms-64 pt-20 lg:pt-6 px-4 lg:px-8 pb-6 max-w-6xl mx-auto lg:mx-0">
+  <!-- Care & Follow-up banner from admin -->
+  <div id="care-banner" class="hidden mb-4 p-4 rounded-2xl bg-gradient-to-r from-secondary-container to-secondary text-white shadow-lg">
+    <div class="flex items-start gap-3">
+      <span class="material-symbols-outlined text-2xl">campaign</span>
+      <div class="flex-1 min-w-0">
+        <h4 id="care-title" class="font-bold mb-1">—</h4>
+        <p id="care-msg" class="text-sm opacity-95 whitespace-pre-wrap">—</p>
+      </div>
+      <button onclick="document.getElementById('care-banner').classList.add('hidden')" class="text-white/80 hover:text-white">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+  </div>
+
   <!-- Top row (desktop 2-col) -->
   <div id="dash-grid" class="lg:gap-6">
     <!-- Left/Top: Time & clock -->
@@ -260,7 +274,7 @@
   </a>
 </nav>
 
-<script src="assets/app.js?v=2026.04.25.11"></script>
+<script src="assets/app.js?v=2026.04.25.12"></script>
 <script>App.initDashboard();</script>
 </body>
 </html>

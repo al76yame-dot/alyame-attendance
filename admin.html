@@ -254,6 +254,27 @@
       </label>
     </div>
 
+    <!-- Care & Follow-up -->
+    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30 space-y-3">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-secondary">campaign</span>
+        <h4 class="font-bold">الاهتمام والمتابعة / Care & Follow-up</h4>
+      </div>
+      <p class="text-xs text-outline">رسالة أو إعلان يظهر لجميع الموظفين أعلى الصفحة الرئيسية (تحفيز، تذكير، توجيه...)</p>
+      <div>
+        <label class="text-xs">عنوان الرسالة</label>
+        <input id="set-care-title" type="text" class="w-full h-11 px-3 border rounded-lg" placeholder="مثلاً: تذكير من الإدارة"/>
+      </div>
+      <div>
+        <label class="text-xs">نص الرسالة</label>
+        <textarea id="set-care-msg" rows="3" class="w-full p-3 border rounded-lg" placeholder="اكتب رسالة تظهر لكل الموظفين..."></textarea>
+      </div>
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input id="set-care-active" type="checkbox" class="w-5 h-5"/>
+        <span class="text-sm font-semibold">تفعيل عرض الرسالة للموظفين</span>
+      </label>
+    </div>
+
     <button onclick="App.saveSettings()" class="w-full h-12 bg-primary text-white font-bold rounded-xl">حفظ الإعدادات</button>
   </section>
 </main>
@@ -294,10 +315,14 @@
         <div>
           <label class="text-sm font-semibold text-on-surface-variant mb-1 block" data-i18n="admin.role">الدور</label>
           <select id="emp-role" class="w-full h-12 px-3 bg-white border border-outline-variant rounded-xl focus:border-primary outline-none">
-            <option value="agent">موظف حجوزات</option>
-            <option value="guide">مرشد سياحي</option>
-            <option value="manager">مدير</option>
-            <option value="driver">سائق</option>
+            <option value="manager">مدير / Manager</option>
+            <option value="bookings">مسؤول حجوزات تذاكر وفنادق / Bookings (Tickets & Hotels)</option>
+            <option value="visas">مسؤول تأشيرات / Visas</option>
+            <option value="finance">القسم المالي / Finance</option>
+            <option value="delegate">مندوب / Delegate</option>
+            <option value="agent">موظف حجوزات (قديم)</option>
+            <option value="guide">مرشد سياحي (قديم)</option>
+            <option value="driver">سائق (قديم)</option>
           </select>
         </div>
         <div>
@@ -385,7 +410,7 @@
   </a>
 </nav>
 
-<script src="assets/app.js?v=2026.04.25.11"></script>
+<script src="assets/app.js?v=2026.04.25.12"></script>
 <script>App.initAdmin();</script>
 </body>
 </html>

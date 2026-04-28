@@ -1,10 +1,17 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.04.25.11';
+const APP_VERSION = '2026.04.25.12';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
+
+// Service Worker registration (for offline + notifications + future push)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(()=>null);
+  });
+}
 
 // Auto-update detector: checks GitHub for newer version every page load
 async function checkForUpdates(){
@@ -56,6 +63,7 @@ const I18N = {
     'login.fail':'بيانات الدخول غير صحيحة','login.fillAll':'الرجاء تعبئة الحقول',
     'login.ctx.title':'جاهزية الجولات','login.ctx.desc':'تحقق تلقائي عبر GPS',
     'role.agent':'موظف حجوزات','role.guide':'مرشد سياحي','role.manager':'مدير','role.driver':'سائق',
+    'role.bookings':'مسؤول حجوزات تذاكر وفنادق','role.visas':'مسؤول تأشيرات','role.finance':'القسم المالي','role.delegate':'مندوب',
     'loc.pending':'جاري تحديد الموقع...','verify.ok':'✓ تم التحقق من الموقع','verify.fail':'تعذّر تحديد الموقع',
     'hint.in':'اضغط لبدء نوبة عملك','hint.out':'اضغط لإنهاء نوبتك',
     'clock.in':'تسجيل الحضور','clock.out':'تسجيل الانصراف',
@@ -81,6 +89,7 @@ const I18N = {
     'login.fail':'Invalid credentials','login.fillAll':'Please fill all fields',
     'login.ctx.title':'Tour Ops Ready','login.ctx.desc':'Automatic GPS verification',
     'role.agent':'Booking Agent','role.guide':'Tour Guide','role.manager':'Manager','role.driver':'Driver',
+    'role.bookings':'Bookings (Tickets & Hotels)','role.visas':'Visas','role.finance':'Finance','role.delegate':'Delegate',
     'loc.pending':'Locating...','verify.ok':'✓ Location verified','verify.fail':'Location unavailable',
     'hint.in':'Tap to start your shift','hint.out':'Tap to end your shift',
     'clock.in':'Check In','clock.out':'Check Out',
@@ -369,6 +378,7 @@ async function initDashboard(){
   wireRequestModal();
   loadMyRequests();
   showShiftInfo();
+  showCareBanner();
   ensureNotifyPermission();
   runShiftAlerts();
   setInterval(runShiftAlerts, 60000);
@@ -466,7 +476,14 @@ function showAlert(title, body){
   beep(3);
   vibrate([300,150,300,150,300]);
   if (notifySupported() && Notification.permission==='granted'){
-    try { new Notification(title, { body, icon:'assets/logo.png', tag: title }); } catch(_){}
+    try {
+      // Prefer SW notifications (richer, works in PWA backgrounded state)
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type:'notify', title, body, tag:title });
+      } else {
+        new Notification(title, { body, icon:'assets/logo.png', tag: title });
+      }
+    } catch(_){}
   }
   // In-page banner
   const b = document.createElement('div');
@@ -521,6 +538,19 @@ async function runShiftAlerts(){
         showAlert('✅ انصراف تلقائي / Auto Check-out', `تم تسجيل انصرافك تلقائياً بعد 30 دقيقة من نهاية الدوام (${b.end}).`);
         await renderDash();
       } catch(_){}
+    }
+  } catch(_){}
+}
+
+async function showCareBanner(){
+  const banner = document.getElementById('care-banner');
+  if (!banner) return;
+  try {
+    const s = await loadSettings();
+    if (s.care_active === 'true' && (s.care_title || s.care_msg)){
+      document.getElementById('care-title').textContent = s.care_title || 'إعلان الإدارة';
+      document.getElementById('care-msg').textContent = s.care_msg || '';
+      banner.classList.remove('hidden');
     }
   } catch(_){}
 }
@@ -697,6 +727,9 @@ async function loadAdminSettings(){
   set('set-cairo-start',    s.branch_cairo_start    || '09:00');
   set('set-cairo-end',      s.branch_cairo_end      || '17:00');
   document.getElementById('set-enforce').checked = s.geofence_enforce === 'true';
+  set('set-care-title', s.care_title || '');
+  document.getElementById('set-care-msg').value = s.care_msg || '';
+  document.getElementById('set-care-active').checked = s.care_active === 'true';
   setTimeout(() => {
     setupBranchMap('tripoli', 32.8872, 13.1913);
     setupBranchMap('cairo',   30.0444, 31.2357);
@@ -716,7 +749,10 @@ async function saveSettings(){
     { key:'branch_cairo_radius_m',   value:v('set-cairo-radius') || '300' },
     { key:'branch_cairo_start',      value:v('set-cairo-start') || '09:00' },
     { key:'branch_cairo_end',        value:v('set-cairo-end')   || '17:00' },
-    { key:'geofence_enforce',        value:document.getElementById('set-enforce').checked ? 'true':'false' }
+    { key:'geofence_enforce',        value:document.getElementById('set-enforce').checked ? 'true':'false' },
+    { key:'care_title',              value:v('set-care-title') || '' },
+    { key:'care_msg',                value:document.getElementById('set-care-msg').value || '' },
+    { key:'care_active',             value:document.getElementById('set-care-active').checked ? 'true':'false' }
   ];
   try {
     await sb('att_settings', {
