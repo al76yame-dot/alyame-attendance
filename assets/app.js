@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.04.25.10';
+const APP_VERSION = '2026.04.25.11';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -365,10 +365,13 @@ async function initDashboard(){
     btn.disabled=false;
   };
 
-  // Wire request modal + load my requests + show shift
+  // Wire request modal + load my requests + show shift + alerts
   wireRequestModal();
   loadMyRequests();
   showShiftInfo();
+  ensureNotifyPermission();
+  runShiftAlerts();
+  setInterval(runShiftAlerts, 60000);
 
   await renderDash();
   setInterval(renderDash, 60000);
@@ -432,6 +435,94 @@ function detectUserBranch(branches, loc, userBranchText){
   if (t.includes('طرابلس') || t.includes('tripoli') || t.includes('libya') || t.includes('ليبيا')) return branches[0];
   if (t.includes('قاهرة') || t.includes('cairo') || t.includes('egypt') || t.includes('مصر')) return branches[1];
   return branches[0];
+}
+
+// ============= Notifications / Alerts / Auto-checkout =============
+function notifySupported(){ return ('Notification' in window); }
+async function ensureNotifyPermission(){
+  if (!notifySupported()) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  try { const p = await Notification.requestPermission(); return p === 'granted'; } catch { return false; }
+}
+function beep(times=2){
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    let t = ctx.currentTime;
+    for (let i=0;i<times;i++){
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type='sine'; o.frequency.value=880;
+      g.gain.value=0.15;
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t); o.stop(t+0.25);
+      t += 0.4;
+    }
+  } catch(_){}
+}
+function vibrate(pattern){ if (navigator.vibrate) try { navigator.vibrate(pattern); } catch(_){} }
+function showAlert(title, body){
+  beep(3);
+  vibrate([300,150,300,150,300]);
+  if (notifySupported() && Notification.permission==='granted'){
+    try { new Notification(title, { body, icon:'assets/logo.png', tag: title }); } catch(_){}
+  }
+  // In-page banner
+  const b = document.createElement('div');
+  b.className = 'fixed top-20 left-1/2 -translate-x-1/2 z-[200] px-5 py-3 bg-primary text-white rounded-2xl shadow-2xl font-bold flex items-center gap-2 animate-[slideDown_.3s]';
+  b.style.maxWidth = '90vw';
+  b.innerHTML = `<span class="material-symbols-outlined">notifications_active</span><div><div>${title}</div><div class="text-xs font-medium opacity-90">${body}</div></div>`;
+  document.body.appendChild(b);
+  setTimeout(()=> b.remove(), 8000);
+}
+
+function todayKey(suffix){ return 'alyame_alert_'+new Date().toISOString().slice(0,10)+'_'+suffix; }
+function alertedToday(suffix){ return localStorage.getItem(todayKey(suffix)) === '1'; }
+function markAlerted(suffix){ localStorage.setItem(todayKey(suffix),'1'); }
+
+function timeToMinutes(hhmm){
+  if (!hhmm) return null;
+  const [h,m] = hhmm.split(':').map(Number);
+  return h*60 + (m||0);
+}
+function nowMinutes(){
+  const d = new Date(); return d.getHours()*60 + d.getMinutes();
+}
+
+async function runShiftAlerts(){
+  if (!state.user || state.user.is_admin) return;
+  try {
+    const s = await loadSettings();
+    const branches = branchesFromSettings(s);
+    const b = detectUserBranch(branches, state.location, state.user.branch);
+    if (!b) return;
+    const startM = timeToMinutes(b.start);
+    const endM = timeToMinutes(b.end);
+    const now = nowMinutes();
+
+    // Check-in reminder: from shift start until +60 min, only if not clocked in
+    if (startM!=null && now >= startM && now < startM+60 && !state.currentLog && !alertedToday('in')) {
+      markAlerted('in');
+      showAlert('🔔 وقت الحضور / Check-in', `بدأ دوامك الآن (${b.start}). سجّل حضورك.`);
+    }
+
+    // Check-out reminder: at shift end, only if still clocked in
+    if (endM!=null && now >= endM && now < endM+30 && state.currentLog && !alertedToday('out')) {
+      markAlerted('out');
+      showAlert('🔔 وقت الانصراف / Check-out', `انتهى دوامك (${b.end}). لا تنسَ تسجيل انصرافك.`);
+    }
+
+    // Auto check-out 30 min after shift end if forgotten
+    if (endM!=null && now >= endM+30 && state.currentLog && !alertedToday('autoout')) {
+      markAlerted('autoout');
+      try {
+        await checkOut(state.location);
+        showAlert('✅ انصراف تلقائي / Auto Check-out', `تم تسجيل انصرافك تلقائياً بعد 30 دقيقة من نهاية الدوام (${b.end}).`);
+        await renderDash();
+      } catch(_){}
+    }
+  } catch(_){}
 }
 
 async function showShiftInfo(){
