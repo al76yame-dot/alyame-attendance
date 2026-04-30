@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.04.30.1';
+const APP_VERSION = '2026.04.30.2';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -709,6 +709,19 @@ function wireRequestModal(){
       document.getElementById('req-modal').classList.add('hidden');
       toast('تم إرسال الطلب','success');
       loadMyRequests();
+      // Notify admins via push
+      try {
+        const admins = await sb('att_employees?is_admin=eq.true&active=eq.true&select=id');
+        const adminIds = (admins||[]).map(a => a.id);
+        if (adminIds.length) {
+          const typeAr = type==='leave' ? 'إجازة' : 'إذن';
+          await sendBroadcastPush(
+            `📨 طلب ${typeAr} جديد`,
+            `${state.user.name} — ${body.start_date}${body.end_date?' إلى '+body.end_date:''}`,
+            adminIds
+          );
+        }
+      } catch(_){}
     } catch(err){ toast('فشل الإرسال: '+err.message,'error'); }
   };
 }
@@ -719,17 +732,23 @@ async function loadMyRequests(){
   const rows = await sb(`att_requests?employee_id=eq.${state.user.id}&order=created_at.desc&limit=20`);
   if (!rows || !rows.length) { list.innerHTML = `<div class="p-6 text-center bg-white rounded-2xl border border-dashed text-outline col-span-full">لا توجد طلبات</div>`; return; }
   list.innerHTML = rows.map(r => {
-    const statColor = r.status==='approved'?'bg-tertiary-fixed text-tertiary':r.status==='rejected'?'bg-error-container text-error':'bg-secondary-fixed text-secondary';
-    const statText = r.status==='approved'?'مقبول':r.status==='rejected'?'مرفوض':'قيد الانتظار';
-    const typeText = r.type==='leave'?'إجازة':'إذن';
-    return `<div class="p-4 bg-white rounded-2xl border border-outline-variant/30">
-      <div class="flex items-center justify-between mb-1">
-        <span class="font-bold text-primary">${typeText}</span>
-        <span class="px-2 py-1 rounded-full text-xs font-bold ${statColor}">${statText}</span>
+    const isLeave = r.type==='leave';
+    const statColor = r.status==='approved'?'bg-tertiary text-white':r.status==='rejected'?'bg-error text-white':'bg-secondary text-white';
+    const statText = r.status==='approved'?'✓ مقبول':r.status==='rejected'?'✗ مرفوض':'⏳ قيد الانتظار';
+    const typeText = isLeave?'إجازة':'إذن';
+    const typeIcon = isLeave?'event_busy':'schedule';
+    return `<div class="p-4 bg-white rounded-2xl border border-outline-variant/30 shadow-sm">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary">${typeIcon}</span>
+          <span class="font-bold text-primary">${typeText}</span>
+        </div>
+        <span class="px-2.5 py-1 rounded-full text-xs font-bold ${statColor}">${statText}</span>
       </div>
-      <p class="text-xs text-outline">${r.start_date}${r.end_date?' → '+r.end_date:''}</p>
-      ${r.reason?`<p class="text-sm mt-1">${r.reason}</p>`:''}
-      ${r.admin_note?`<p class="text-xs mt-2 p-2 bg-surface-container-low rounded">رد المدير: ${r.admin_note}</p>`:''}
+      <p class="text-xs text-outline" dir="ltr">📅 ${r.start_date}${r.end_date?' → '+r.end_date:''}</p>
+      ${r.start_time?`<p class="text-xs text-outline mt-0.5" dir="ltr">⏰ ${r.start_time}${r.end_time?' → '+r.end_time:''}</p>`:''}
+      ${r.reason?`<p class="text-sm mt-2">${r.reason}</p>`:''}
+      ${r.admin_note?`<div class="mt-2 p-2 bg-primary-fixed text-primary rounded-lg"><p class="text-xs font-bold mb-0.5">📩 رد المدير:</p><p class="text-sm">${r.admin_note}</p></div>`:''}
     </div>`;
   }).join('');
 }
@@ -744,34 +763,91 @@ async function loadAdminRequests(filter='pending'){
   if (!rows || !rows.length){ list.innerHTML = `<div class="p-10 text-center bg-white rounded-2xl border border-dashed text-outline col-span-full">لا توجد طلبات</div>`; return; }
   list.innerHTML = rows.map(r => {
     const e = r.att_employees||{};
-    const typeText = r.type==='leave'?'إجازة':'إذن';
-    const statColor = r.status==='approved'?'bg-tertiary-fixed text-tertiary':r.status==='rejected'?'bg-error-container text-error':'bg-secondary-fixed text-secondary';
-    const statText = r.status==='approved'?'مقبول':r.status==='rejected'?'مرفوض':'قيد الانتظار';
+    const isLeave = r.type==='leave';
+    const typeText = isLeave?'إجازة / Leave':'إذن / Permission';
+    const typeIcon = isLeave?'event_busy':'schedule';
+    const typeColor = isLeave?'text-secondary bg-secondary-container/20':'text-tertiary bg-tertiary-container/20';
+    const statColor = r.status==='approved'?'bg-tertiary text-white':r.status==='rejected'?'bg-error text-white':'bg-secondary text-white';
+    const statText = r.status==='approved'?'✓ مقبول':r.status==='rejected'?'✗ مرفوض':'⏳ قيد الانتظار';
+    // Calculate days/duration
+    let durationText = '';
+    if (isLeave){
+      const s = new Date(r.start_date);
+      const e2 = r.end_date ? new Date(r.end_date) : s;
+      const days = Math.max(1, Math.round((e2 - s)/(1000*60*60*24)) + 1);
+      durationText = `${days} ${days===1?'يوم':'أيام'}`;
+    } else if (r.start_time && r.end_time){
+      const [sh,sm] = r.start_time.split(':').map(Number);
+      const [eh,em] = r.end_time.split(':').map(Number);
+      const mins = (eh*60+em) - (sh*60+sm);
+      if (mins > 0) durationText = `${Math.floor(mins/60)}س ${mins%60}د`;
+    }
+    const created = new Date(r.created_at);
+    const ago = Math.round((Date.now() - created)/(1000*60));
+    const agoText = ago < 60 ? `${ago} دقيقة` : ago < 1440 ? `${Math.floor(ago/60)} ساعة` : `${Math.floor(ago/1440)} يوم`;
     const actions = r.status==='pending' ? `
-      <div class="flex gap-2 mt-3">
-        <button onclick="App.decideRequest('${r.id}','approved')" class="flex-1 h-10 bg-tertiary text-white font-bold rounded-lg text-sm">قبول</button>
-        <button onclick="App.decideRequest('${r.id}','rejected')" class="flex-1 h-10 bg-error-container text-error font-bold rounded-lg text-sm">رفض</button>
-      </div>` : '';
-    return `<div class="p-4 bg-white rounded-2xl border border-outline-variant/30">
-      <div class="flex items-center justify-between mb-1">
-        <div>
-          <p class="font-bold text-primary">${e.name||'—'}</p>
-          <p class="text-xs text-outline">${typeText} · ${r.start_date}${r.end_date?' → '+r.end_date:''}</p>
+      <div class="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-outline-variant/20">
+        <button onclick="App.decideRequest('${r.id}','approved')" class="h-11 bg-tertiary text-white font-bold rounded-xl text-sm flex items-center justify-center gap-1 active:scale-95">
+          <span class="material-symbols-outlined text-[18px]">check_circle</span>قبول
+        </button>
+        <button onclick="App.decideRequest('${r.id}','rejected')" class="h-11 bg-error text-white font-bold rounded-xl text-sm flex items-center justify-center gap-1 active:scale-95">
+          <span class="material-symbols-outlined text-[18px]">cancel</span>رفض
+        </button>
+      </div>` : (r.admin_note ? `<div class="mt-3 pt-3 border-t border-outline-variant/20"><p class="text-xs text-outline mb-1">رد المدير:</p><p class="text-sm">${r.admin_note}</p></div>` : '');
+    return `<div class="p-4 bg-white rounded-2xl border border-outline-variant/40 shadow-sm hover:shadow-md transition">
+      <div class="flex items-start gap-3 mb-3">
+        <div class="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center font-extrabold text-lg shrink-0">${initials(e.name)}</div>
+        <div class="flex-1 min-w-0">
+          <p class="font-bold text-primary truncate">${e.name||'—'}</p>
+          <p class="text-xs text-outline">${e.role?t('role.'+e.role):''} ${e.phone?'· '+e.phone:''}</p>
+          <p class="text-[11px] text-outline mt-0.5">قبل ${agoText}</p>
         </div>
-        <span class="px-2 py-1 rounded-full text-xs font-bold ${statColor}">${statText}</span>
+        <span class="px-2.5 py-1 rounded-full text-xs font-bold ${statColor} whitespace-nowrap">${statText}</span>
       </div>
-      ${r.start_time?`<p class="text-xs text-outline">${r.start_time} - ${r.end_time||''}</p>`:''}
-      ${r.reason?`<p class="text-sm mt-2">${r.reason}</p>`:''}
+      <div class="space-y-1.5 mb-1">
+        <div class="flex items-center gap-2 text-sm">
+          <span class="material-symbols-outlined text-[18px] ${typeColor.split(' ')[0]}">${typeIcon}</span>
+          <span class="font-bold">${typeText}</span>
+          ${durationText?`<span class="ms-auto text-xs px-2 py-0.5 rounded-full ${typeColor} font-bold">${durationText}</span>`:''}
+        </div>
+        <div class="flex items-center gap-2 text-xs text-on-surface-variant">
+          <span class="material-symbols-outlined text-[16px]">date_range</span>
+          <span dir="ltr">${r.start_date}${r.end_date?' → '+r.end_date:''}</span>
+        </div>
+        ${r.start_time?`<div class="flex items-center gap-2 text-xs text-on-surface-variant"><span class="material-symbols-outlined text-[16px]">schedule</span><span dir="ltr">${r.start_time}${r.end_time?' → '+r.end_time:''}</span></div>`:''}
+        ${r.reason?`<div class="mt-2 p-2 bg-surface-container-low rounded-lg"><p class="text-xs text-outline mb-0.5">السبب:</p><p class="text-sm">${r.reason}</p></div>`:''}
+      </div>
       ${actions}
     </div>`;
   }).join('');
 }
 
 async function decideRequest(id, status){
-  const note = status==='rejected' ? (prompt('سبب الرفض (اختياري):')||null) : null;
+  const reqs = window._adminReqs || [];
+  const req = reqs.find(r => r.id === id);
+  let note = null;
+  if (status === 'rejected') {
+    note = prompt('سبب الرفض (سيظهر للموظف):') || null;
+    if (note === null) return; // user cancelled
+  } else {
+    note = prompt('ملاحظة للموظف (اختياري):', '') || null;
+  }
   await sb(`att_requests?id=eq.${id}`, { method:'PATCH', body:{
     status, admin_note: note, decided_by: state.user.id, decided_at: new Date().toISOString()
   }});
+  // Notify employee via push
+  try {
+    if (req?.employee_id) {
+      const typeAr = req.type==='leave' ? 'إجازة' : 'إذن';
+      const statAr = status==='approved' ? '✅ تم قبول' : '❌ تم رفض';
+      const noteText = note ? `\n${note}` : '';
+      await sendBroadcastPush(
+        `${statAr} طلب ${typeAr}`,
+        `${req.start_date}${req.end_date?' إلى '+req.end_date:''}${noteText}`,
+        [req.employee_id]
+      );
+    }
+  } catch(_){}
   await loadAdminRequests(window._reqFilter||'pending');
   await refreshPendingBadge();
 }
@@ -1169,6 +1245,8 @@ async function initAdmin(){
   await refreshStats();
   await refreshPendingBadge();
   switchTab('employees');
+  // Auto-refresh pending requests count every 30s
+  setInterval(refreshPendingBadge, 30000);
 }
 
 function switchTab(tab){
