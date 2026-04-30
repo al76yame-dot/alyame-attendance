@@ -1,5 +1,5 @@
 // Alyame Attendance — Service Worker
-const CACHE = 'alyame-v1';
+const CACHE = 'alyame-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -24,19 +24,22 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Network-first for HTML/JS so updates roll out fast; cache fallback offline
+// Network-first; only cache successful 200 responses to avoid serving 404s
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  // Don't cache Supabase/API or external CDNs
   if (url.origin !== location.origin) return;
+  // Always bypass cache for HTML — guarantees fresh shell
+  const isHTML = req.mode === 'navigate' || (req.headers.get('accept')||'').includes('text/html');
   e.respondWith(
     fetch(req).then(res => {
-      const clone = res.clone();
-      caches.open(CACHE).then(c => c.put(req, clone)).catch(()=>null);
+      if (res && res.status === 200) {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(req, clone)).catch(()=>null);
+      }
       return res;
-    }).catch(() => caches.match(req).then(r => r || caches.match('./index.html')))
+    }).catch(() => caches.match(req).then(r => r || (isHTML ? caches.match('./index.html') : undefined)))
   );
 });
 

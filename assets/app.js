@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.04.30.3';
+const APP_VERSION = '2026.04.30.4';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -14,6 +14,19 @@ if ('serviceWorker' in navigator) {
 }
 
 // Auto-update detector: checks GitHub for newer version every page load
+async function clearAllCaches(){
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+  } catch(_){}
+}
+
 async function checkForUpdates(){
   try {
     const r = await fetch('version.txt?_=' + Date.now(), { cache: 'no-store' });
@@ -23,12 +36,19 @@ async function checkForUpdates(){
     if (!local) { localStorage.setItem(LS_VER, remote); return; }
     if (remote && remote !== local) {
       localStorage.setItem(LS_VER, remote);
-      // soft reload bypassing cache
+      await clearAllCaches();
       location.reload();
     }
   } catch(_){}
 }
 checkForUpdates();
+
+// Emergency reset via URL: ?reset=1
+if (location.search.includes('reset=1')) {
+  clearAllCaches().then(() => {
+    location.replace(location.pathname);
+  });
+}
 
 // ============= Supabase REST client (no SDK needed) =============
 async function sb(path, opts={}){
