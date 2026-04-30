@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.04.25.13';
+const APP_VERSION = '2026.04.30.1';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -379,7 +379,8 @@ async function initDashboard(){
   loadMyRequests();
   showShiftInfo();
   showCareBanner();
-  ensureNotifyPermission().then(ok => { if (ok) subscribeToPush(); });
+  ensureNotifyPermission().then(ok => { if (ok) subscribeToPush(); checkNotifStatus(); });
+  setTimeout(checkNotifStatus, 1500);
   runShiftAlerts();
   setInterval(runShiftAlerts, 60000);
 
@@ -455,6 +456,48 @@ function urlBase64ToUint8Array(base64String){
   const out = new Uint8Array(raw.length);
   for (let i=0;i<raw.length;i++) out[i] = raw.charCodeAt(i);
   return out;
+}
+
+async function checkNotifStatus(){
+  const banner = document.getElementById('notif-banner');
+  if (!banner) return;
+  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return; // not supported, hide banner
+  }
+  let needsBanner = false;
+  if (Notification.permission !== 'granted') {
+    needsBanner = true;
+  } else {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub) needsBanner = true;
+    } catch { needsBanner = true; }
+  }
+  banner.classList.toggle('hidden', !needsBanner);
+}
+
+async function enableNotifications(){
+  if (Notification.permission === 'denied') {
+    alert('الإشعارات محظورة من إعدادات المتصفح. افتح إعدادات الموقع وفعّل الإشعارات يدوياً.');
+    return;
+  }
+  const ok = await ensureNotifyPermission();
+  if (!ok) {
+    alert('يجب السماح بالإشعارات من رسالة المتصفح');
+    return;
+  }
+  await subscribeToPush();
+  await checkNotifStatus();
+  // Test notification
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    reg.showNotification('✅ تم تفعيل الإشعارات', {
+      body: 'ستصلك الآن تنبيهات الحضور والانصراف',
+      icon: 'assets/logo.png',
+      vibrate: [300,150,300]
+    });
+  } catch(_){}
 }
 
 async function subscribeToPush(){
@@ -535,9 +578,14 @@ function showAlert(title, body){
   vibrate([300,150,300,150,300]);
   if (notifySupported() && Notification.permission==='granted'){
     try {
-      // Prefer SW notifications (richer, works in PWA backgrounded state)
-      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type:'notify', title, body, tag:title });
+      // Use SW registration directly (most reliable, includes vibration)
+      if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+        navigator.serviceWorker.ready.then(reg => {
+          reg.showNotification(title, {
+            body, icon:'assets/logo.png', badge:'assets/logo.png',
+            vibrate:[400,200,400,200,400], tag: title, requireInteraction: false
+          });
+        });
       } else {
         new Notification(title, { body, icon:'assets/logo.png', tag: title });
       }
@@ -822,6 +870,25 @@ async function saveSettings(){
     });
     toast('تم الحفظ','success');
   } catch(e){ toast('فشل: '+e.message,'error'); }
+}
+
+async function sendTestPushToMe(){
+  try {
+    const r = await sendBroadcastPush('🔔 اختبار اليامي', 'هذا إشعار تجريبي — إذا وصلك فالنظام يعمل!', [state.user.id]);
+    alert(`أرسل إلى ${r.sent} من ${r.total} اشتراك مرتبط بحسابك`);
+  } catch(e){ alert('فشل: '+e.message); }
+}
+
+async function resetTodayAlerts(){
+  if (!confirm('سيتم إعادة تعيين تنبيهات اليوم — ستفير التنبيهات من جديد عند الأوقات المحددة')) return;
+  const today = new Date().toISOString().slice(0,10);
+  const keys = ['in','out','auto'].flatMap(t => ['tripoli','cairo'].map(b => `alert_${b}_${t}_${today}`));
+  for (const k of keys){
+    try {
+      await sb(`att_settings?key=eq.${k}`, { method:'DELETE' });
+    } catch(_){}
+  }
+  alert('✅ تم إعادة التعيين. ستفير التنبيهات من جديد عند الأوقات المحددة.');
 }
 
 async function sendPushNow(){
@@ -1380,5 +1447,5 @@ function wireCommon(){
   });
 }
 
-window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, sendPushNow, state };
+window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, sendPushNow, sendTestPushToMe, resetTodayAlerts, enableNotifications, state };
 })();

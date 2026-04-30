@@ -89,6 +89,20 @@
 </header>
 
 <main class="lg:ms-64 pt-20 lg:pt-6 px-4 lg:px-8 pb-6 max-w-6xl mx-auto lg:mx-0">
+  <!-- Notification enable banner -->
+  <div id="notif-banner" class="hidden mb-4 p-4 rounded-2xl bg-gradient-to-r from-error to-secondary text-white shadow-lg">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-3xl">notifications_off</span>
+      <div class="flex-1 min-w-0">
+        <h4 class="font-bold mb-0.5">الإشعارات معطّلة!</h4>
+        <p class="text-xs opacity-95">فعّل الإشعارات لتصلك تنبيهات الحضور والانصراف</p>
+      </div>
+      <button onclick="App.enableNotifications()" class="px-4 py-2 bg-white text-error font-bold rounded-xl text-sm whitespace-nowrap">
+        تفعيل
+      </button>
+    </div>
+  </div>
+
   <!-- Care & Follow-up banner from admin -->
   <div id="care-banner" class="hidden mb-4 p-4 rounded-2xl bg-gradient-to-r from-secondary-container to-secondary text-white shadow-lg">
     <div class="flex items-start gap-3">
@@ -274,7 +288,7 @@
   </a>
 </nav>
 
-<script src="assets/app.js?v=2026.04.25.13"></script>
+<script src="assets/app.js?v=2026.04.30.1"></script>
 <script>App.initDashboard();</script>
 </body>
 </html>
