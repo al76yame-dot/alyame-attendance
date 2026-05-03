@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.04.30.7';
+const APP_VERSION = '2026.04.30.8';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -482,7 +482,10 @@ async function checkNotifStatus(){
   const banner = document.getElementById('notif-banner');
   if (!banner) return;
   if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-    return; // not supported, hide banner
+    // Unsupported browser — show different message
+    banner.innerHTML = `<div class="flex items-center gap-3"><span class="material-symbols-outlined text-3xl">warning</span><div class="flex-1"><h4 class="font-bold mb-0.5">المتصفح لا يدعم الإشعارات</h4><p class="text-xs opacity-95">استخدم Chrome على Android، أو ثبّت التطبيق على الشاشة الرئيسية على iPhone</p></div></div>`;
+    banner.classList.remove('hidden');
+    return;
   }
   let needsBanner = false;
   if (Notification.permission !== 'granted') {
@@ -495,6 +498,11 @@ async function checkNotifStatus(){
     } catch { needsBanner = true; }
   }
   banner.classList.toggle('hidden', !needsBanner);
+}
+
+function showNotifGuide(){
+  const m = document.getElementById('notif-guide');
+  if (m) { m.classList.remove('hidden'); m.style.display = 'flex'; }
 }
 
 async function enableNotifications(){
@@ -1581,5 +1589,5 @@ function wireCommon(){
   });
 }
 
-window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, sendPushNow, sendTestPushToMe, resetTodayAlerts, enableNotifications, state };
+window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, sendPushNow, sendTestPushToMe, resetTodayAlerts, enableNotifications, showNotifGuide, state };
 })();

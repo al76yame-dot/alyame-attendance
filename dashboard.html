@@ -128,9 +128,64 @@
         <h4 class="font-bold mb-0.5">الإشعارات معطّلة!</h4>
         <p class="text-xs opacity-95">فعّل الإشعارات لتصلك تنبيهات الحضور والانصراف</p>
       </div>
-      <button onclick="App.enableNotifications()" class="px-4 py-2 bg-white text-error font-bold rounded-xl text-sm whitespace-nowrap">
-        تفعيل
-      </button>
+      <div class="flex gap-2">
+        <button onclick="App.showNotifGuide()" class="w-10 h-10 bg-white/20 text-white rounded-xl flex items-center justify-center" title="كيف؟">
+          <span class="material-symbols-outlined text-[20px]">help</span>
+        </button>
+        <button onclick="App.enableNotifications()" class="px-4 py-2 bg-white text-error font-bold rounded-xl text-sm whitespace-nowrap">
+          تفعيل
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Help Modal -->
+  <div id="notif-guide" class="hidden fixed inset-0 z-[200] flex items-end lg:items-center justify-center p-0 lg:p-6 bg-black/60 backdrop-blur-sm">
+    <div class="bg-white w-full lg:max-w-md rounded-t-3xl lg:rounded-3xl max-h-[90vh] overflow-y-auto">
+      <div class="sticky top-0 bg-white flex justify-between items-center p-5 border-b border-outline-variant/30">
+        <h3 class="text-lg font-bold text-primary">كيفية تفعيل الإشعارات</h3>
+        <button onclick="document.getElementById('notif-guide').classList.add('hidden')" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="p-5 space-y-4 text-sm">
+        <div class="p-4 bg-primary-fixed text-primary rounded-xl">
+          <p class="font-bold mb-1">📱 الطريقة الأسهل:</p>
+          <p>اضغط زر <b>"تفعيل"</b> الأحمر في أعلى الصفحة، واقبل طلب المتصفح.</p>
+        </div>
+        <div>
+          <h4 class="font-bold text-primary mb-2">🤖 Android (Chrome)</h4>
+          <ol class="space-y-1 text-xs text-on-surface-variant list-decimal ms-5">
+            <li>اضغط 🔒 على شريط العنوان</li>
+            <li>اختر <b>"إعدادات الموقع"</b></li>
+            <li>غيّر <b>"الإشعارات"</b> إلى <b>"السماح"</b></li>
+            <li>أعد تحميل الصفحة</li>
+          </ol>
+        </div>
+        <div>
+          <h4 class="font-bold text-primary mb-2">🍎 iPhone (Safari)</h4>
+          <ol class="space-y-1 text-xs text-on-surface-variant list-decimal ms-5">
+            <li><b>أضف للشاشة الرئيسية أولاً</b> (شرط آبل):
+              زر المشاركة (□↑) → "إضافة إلى الشاشة الرئيسية"</li>
+            <li>افتح التطبيق من الأيقونة الجديدة</li>
+            <li>سجّل الدخول واضغط "تفعيل"</li>
+          </ol>
+        </div>
+        <div>
+          <h4 class="font-bold text-primary mb-2">💻 الكمبيوتر</h4>
+          <ol class="space-y-1 text-xs text-on-surface-variant list-decimal ms-5">
+            <li>🔒 على شريط العنوان → إعدادات الموقع</li>
+            <li>الإشعارات → السماح</li>
+            <li>أعد تحميل الصفحة (F5)</li>
+          </ol>
+        </div>
+        <div class="p-3 bg-secondary-fixed text-secondary rounded-xl text-xs">
+          ⚠️ إذا رفضت الإذن سابقاً، يجب تفعيلها يدوياً من إعدادات المتصفح كما هو موضّح أعلاه.
+        </div>
+        <button onclick="document.getElementById('notif-guide').classList.add('hidden'); App.enableNotifications();" class="w-full h-12 bg-primary text-white font-bold rounded-xl">
+          🔔 محاولة التفعيل الآن
+        </button>
+      </div>
     </div>
   </div>
 
@@ -319,7 +374,7 @@
   </a>
 </nav>
 
-<script src="assets/app.js?v=2026.04.30.7"></script>
+<script src="assets/app.js?v=2026.04.30.8"></script>
 <script>App.initDashboard();</script>
 </body>
 </html>

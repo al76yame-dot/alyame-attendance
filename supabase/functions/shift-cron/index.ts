@@ -99,24 +99,75 @@ async function processBranch(branchKey: string, s: Record<string,string>){
 
   const results: any = { branch: branchKey, sent:{} };
 
-  // Check-in reminder: at shift start (±1 min)
+  // Pre-check-in reminder: 15 min before shift start
+  const preInKey = `alert_${branchKey}_prein_${date}`;
+  if (Math.abs(minutes - (startM-15)) <= 2 && s[preInKey] !== "1") {
+    const sent = await sendPushToEmployees(empIds, "⏰ تذكير قبل الحضور", `يبدأ دوامك بعد 15 دقيقة (${start}). استعد لتسجيل الحضور.`, `pre-in-${branchKey}-${date}`);
+    await setSetting(preInKey, "1");
+    results.sent.preIn = sent;
+  }
+
+  // Check-in reminder: at shift start (±2 min)
   const inKey = `alert_${branchKey}_in_${date}`;
   if (Math.abs(minutes - startM) <= 2 && s[inKey] !== "1") {
-    const sent = await sendPushToEmployees(empIds, "🔔 وقت الحضور", `بدأ دوامك (${start}). سجّل حضورك الآن.`, `shift-in-${branchKey}-${date}`);
+    const sent = await sendPushToEmployees(empIds, "🔔 وقت الحضور الآن", `بدأ دوامك (${start}). سجّل حضورك الآن!`, `shift-in-${branchKey}-${date}`);
     await setSetting(inKey, "1");
     results.sent.in = sent;
   }
 
-  // Check-out reminder: at shift end (±1 min) — only to those still clocked in
+  // Late check-in nudge: 15 min after shift start (for those who haven't clocked in)
+  const lateInKey = `alert_${branchKey}_latein_${date}`;
+  if (Math.abs(minutes - (startM+15)) <= 2 && s[lateInKey] !== "1") {
+    // Find employees who DON'T have an open log today
+    const open = await getOpenLogs(empIds);
+    const openSet = new Set(open.map((l: any) => l.employee_id));
+    // Check if any have any log today
+    const startToday = new Date();
+    startToday.setUTCHours(0,0,0,0);
+    const { data: todayLogs } = await supa.from("att_logs").select("employee_id").gte("check_in", startToday.toISOString()).in("employee_id", empIds);
+    const checkedInToday = new Set((todayLogs||[]).map((l: any) => l.employee_id));
+    const missing = empIds.filter(id => !checkedInToday.has(id));
+    if (missing.length) {
+      const sent = await sendPushToEmployees(missing, "⚠️ لم تسجّل حضورك بعد", `مرّت 15 دقيقة على بداية الدوام. سجّل حضورك الآن.`, `late-in-${branchKey}-${date}`);
+      results.sent.lateIn = sent;
+    }
+    await setSetting(lateInKey, "1");
+  }
+
+  // Pre-check-out reminder: 15 min before shift end
+  const preOutKey = `alert_${branchKey}_preout_${date}`;
+  if (Math.abs(minutes - (endM-15)) <= 2 && s[preOutKey] !== "1") {
+    const open = await getOpenLogs(empIds);
+    const targets = open.map((l: any) => l.employee_id);
+    if (targets.length) {
+      const sent = await sendPushToEmployees(targets, "⏰ تذكير قبل الانصراف", `ينتهي دوامك بعد 15 دقيقة (${end}).`, `pre-out-${branchKey}-${date}`);
+      results.sent.preOut = sent;
+    }
+    await setSetting(preOutKey, "1");
+  }
+
+  // Check-out reminder: at shift end
   const outKey = `alert_${branchKey}_out_${date}`;
   if (Math.abs(minutes - endM) <= 2 && s[outKey] !== "1") {
     const open = await getOpenLogs(empIds);
     const targets = open.map((l: any) => l.employee_id);
     if (targets.length) {
-      const sent = await sendPushToEmployees(targets, "🔔 وقت الانصراف", `انتهى دوامك (${end}). لا تنسَ تسجيل انصرافك.`, `shift-out-${branchKey}-${date}`);
+      const sent = await sendPushToEmployees(targets, "🔔 وقت الانصراف الآن", `انتهى دوامك (${end}). لا تنسَ تسجيل انصرافك!`, `shift-out-${branchKey}-${date}`);
       results.sent.out = sent;
     }
     await setSetting(outKey, "1");
+  }
+
+  // Late check-out reminder: 15 min after shift end
+  const lateOutKey = `alert_${branchKey}_lateout_${date}`;
+  if (Math.abs(minutes - (endM+15)) <= 2 && s[lateOutKey] !== "1") {
+    const open = await getOpenLogs(empIds);
+    const targets = open.map((l: any) => l.employee_id);
+    if (targets.length) {
+      const sent = await sendPushToEmployees(targets, "⚠️ لم تسجّل الانصراف بعد", `مرّت 15 دقيقة على نهاية الدوام. سيتم تسجيل انصرافك تلقائياً بعد 15 دقيقة أخرى.`, `late-out-${branchKey}-${date}`);
+      results.sent.lateOut = sent;
+    }
+    await setSetting(lateOutKey, "1");
   }
 
   // Auto check-out at shift end +30 (±2 min window)
