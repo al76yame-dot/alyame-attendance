@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.04.30.5';
+const APP_VERSION = '2026.04.30.6';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -697,19 +697,47 @@ async function showShiftInfo(){
 }
 
 // ============= Employee Requests =============
+function openReqModal(){
+  const m = document.getElementById('req-modal');
+  if (!m) { alert('نموذج الطلب غير متاح'); return; }
+  const fromEl = document.getElementById('rq-from');
+  const toEl   = document.getElementById('rq-to');
+  const reasonEl = document.getElementById('rq-reason');
+  const typeEl = document.getElementById('rq-type');
+  const timeRow = document.getElementById('rq-time-row');
+  if (fromEl) fromEl.value = new Date().toISOString().slice(0,10);
+  if (toEl) toEl.value = '';
+  if (reasonEl) reasonEl.value = '';
+  if (typeEl) typeEl.value = 'leave';
+  if (timeRow) timeRow.classList.add('hidden');
+  // Ensure modal is on top of everything (move to body if not already)
+  if (m.parentElement && m.parentElement !== document.body) {
+    document.body.appendChild(m);
+  }
+  m.classList.remove('hidden');
+  m.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeReqModal(){
+  const m = document.getElementById('req-modal');
+  if (!m) return;
+  m.classList.add('hidden');
+  m.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
 function wireRequestModal(){
   const btn = document.getElementById('btn-new-request');
   if (!btn) return;
-  btn.onclick = () => {
-    document.getElementById('rq-from').value = new Date().toISOString().slice(0,10);
-    document.getElementById('rq-to').value = '';
-    document.getElementById('rq-reason').value = '';
-    document.getElementById('rq-type').value = 'leave';
-    document.getElementById('rq-time-row').classList.add('hidden');
-    document.getElementById('req-modal').classList.remove('hidden');
-  };
-  document.getElementById('rq-type').onchange = (e) => {
-    document.getElementById('rq-time-row').classList.toggle('hidden', e.target.value !== 'permission');
+  btn.onclick = openReqModal;
+  // Also support clicking the close X / cancel buttons globally via event delegation
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.closest && e.target.closest('[data-close-req]')) closeReqModal();
+  });
+  const typeEl = document.getElementById('rq-type');
+  if (typeEl) typeEl.onchange = (e) => {
+    const tr = document.getElementById('rq-time-row');
+    if (tr) tr.classList.toggle('hidden', e.target.value !== 'permission');
   };
   document.getElementById('req-form').onsubmit = async (e) => {
     e.preventDefault();
@@ -726,7 +754,7 @@ function wireRequestModal(){
     };
     try {
       await sb('att_requests', { method:'POST', body });
-      document.getElementById('req-modal').classList.add('hidden');
+      closeReqModal();
       toast('تم إرسال الطلب','success');
       loadMyRequests();
       // Notify admins via push

@@ -230,9 +230,9 @@
         <span>طلباتي</span>
         <span class="text-xs font-medium opacity-70">My Requests</span>
       </h3>
-      <button id="btn-new-request" class="ms-auto px-4 py-2 bg-secondary-container text-white font-semibold rounded-xl flex items-center gap-1 active:scale-95">
-        <span class="material-symbols-outlined text-[18px]">add</span>
-        <span>طلب جديد / New</span>
+      <button id="btn-new-request" type="button" class="ms-auto px-5 py-2.5 bg-secondary text-white font-bold rounded-xl flex items-center gap-2 active:scale-95 shadow-md">
+        <span class="material-symbols-outlined text-[20px]">add_circle</span>
+        <span>طلب إجازة/إذن</span>
       </button>
     </div>
     <div id="my-requests" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
@@ -243,7 +243,7 @@
     <div class="bg-white w-full lg:max-w-md rounded-t-3xl lg:rounded-3xl max-h-[90vh] overflow-y-auto">
       <div class="sticky top-0 bg-white flex justify-between items-center p-5 border-b border-outline-variant/30">
         <h3 class="text-lg font-bold text-primary">طلب جديد / New Request</h3>
-        <button onclick="document.getElementById('req-modal').classList.add('hidden')" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container">
+        <button data-close-req class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container">
           <span class="material-symbols-outlined">close</span>
         </button>
       </div>
@@ -280,7 +280,7 @@
           <textarea id="rq-reason" rows="3" class="w-full p-3 bg-white border border-outline-variant rounded-xl" placeholder="اكتب السبب..."></textarea>
         </div>
         <div class="flex gap-2 pt-3 border-t border-outline-variant/30">
-          <button type="button" onclick="document.getElementById('req-modal').classList.add('hidden')" class="flex-1 h-12 bg-surface-container font-semibold rounded-xl">إلغاء</button>
+          <button type="button" data-close-req class="flex-1 h-12 bg-surface-container font-semibold rounded-xl">إلغاء</button>
           <button type="submit" class="flex-1 h-12 bg-primary text-white font-bold rounded-xl">إرسال</button>
         </div>
       </form>
@@ -319,7 +319,7 @@
   </a>
 </nav>
 
-<script src="assets/app.js?v=2026.04.30.5"></script>
+<script src="assets/app.js?v=2026.04.30.6"></script>
 <script>App.initDashboard();</script>
 </body>
 </html>
