@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.04.30.6';
+const APP_VERSION = '2026.04.30.7';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -804,9 +804,17 @@ async function loadMyRequests(){
 // ============= Admin: Requests management =============
 async function loadAdminRequests(filter='pending'){
   const list = document.getElementById('requests-list');
-  let q = 'att_requests?order=created_at.desc&select=*,att_employees(name,phone,role)';
-  if (filter !== 'all') q += `&status=eq.${filter}`;
-  const rows = await sb(q);
+  if (!list) return;
+  list.innerHTML = `<div class="p-6 text-center text-outline col-span-full">جاري التحميل...</div>`;
+  let rows;
+  try {
+    let q = 'att_requests?order=created_at.desc&select=*,att_employees!att_requests_employee_id_fkey(name,phone,role)';
+    if (filter !== 'all') q += `&status=eq.${filter}`;
+    rows = await sb(q);
+  } catch(e){
+    list.innerHTML = `<div class="p-6 text-center bg-error-container text-error rounded-2xl col-span-full">فشل تحميل الطلبات: ${e.message}</div>`;
+    return;
+  }
   window._adminReqs = rows;
   if (!rows || !rows.length){ list.innerHTML = `<div class="p-10 text-center bg-white rounded-2xl border border-dashed text-outline col-span-full">لا توجد طلبات</div>`; return; }
   list.innerHTML = rows.map(r => {
