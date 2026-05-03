@@ -158,21 +158,9 @@ async function processBranch(branchKey: string, s: Record<string,string>){
     await setSetting(outKey, "1");
   }
 
-  // Late check-out reminder: 30 min after shift end (warning before auto-out)
-  const lateOutKey = `alert_${branchKey}_lateout_${date}`;
-  if (Math.abs(minutes - (endM+30)) <= 2 && s[lateOutKey] !== "1") {
-    const open = await getOpenLogs(empIds);
-    const targets = open.map((l: any) => l.employee_id);
-    if (targets.length) {
-      const sent = await sendPushToEmployees(targets, "⚠️ لم تسجّل الانصراف بعد", `مرّت 30 دقيقة على نهاية الدوام. سيتم تسجيل انصرافك تلقائياً بعد 15 دقيقة إن لم تسجّل بنفسك.`, `late-out-${branchKey}-${date}`);
-      results.sent.lateOut = sent;
-    }
-    await setSetting(lateOutKey, "1");
-  }
-
-  // Auto check-out at shift end +45 (±2 min window) — 15 min after the warning
+  // Auto check-out at shift end +30 (±2 min window) — combined notification + auto-out
   const autoKey = `alert_${branchKey}_auto_${date}`;
-  if (Math.abs(minutes - (endM+45)) <= 2 && s[autoKey] !== "1") {
+  if (Math.abs(minutes - (endM+30)) <= 2 && s[autoKey] !== "1") {
     const open = await getOpenLogs(empIds);
     let auto = 0;
     const out = new Date(); // current UTC time
@@ -189,7 +177,7 @@ async function processBranch(branchKey: string, s: Record<string,string>){
     }
     if (auto > 0){
       const targets = open.map((l: any) => l.employee_id);
-      await sendPushToEmployees(targets, "✅ انصراف تلقائي", `تم تسجيل انصرافك تلقائياً (مرّ 45 دقيقة على نهاية الدوام ${end}).`, `auto-out-${branchKey}-${date}`);
+      await sendPushToEmployees(targets, "✅ انصراف تلقائي", `تم تسجيل انصرافك تلقائياً بعد 30 دقيقة من نهاية الدوام (${end}).`, `auto-out-${branchKey}-${date}`);
     }
     await setSetting(autoKey, "1");
     results.sent.auto = auto;
