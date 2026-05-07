@@ -73,8 +73,9 @@ function matchBranchText(branch: string, t: string){
 }
 
 async function getBranchEmployeeIds(branch: string): Promise<string[]>{
-  const { data } = await supa.from("att_employees").select("id, branch, is_admin, active").eq("active", true);
-  return (data||[]).filter((e: any) => !e.is_admin && matchBranchText(branch, e.branch||"")).map((e: any) => e.id);
+  // Include ALL active employees in branch (admins, managers, finance, etc.)
+  const { data } = await supa.from("att_employees").select("id, branch, active").eq("active", true);
+  return (data||[]).filter((e: any) => matchBranchText(branch, e.branch||"")).map((e: any) => e.id);
 }
 
 async function getOpenLogs(employeeIds: string[]){
