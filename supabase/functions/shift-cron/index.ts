@@ -23,12 +23,13 @@ const corsHeaders = {
 function nowInTZ(tz: string){
   // Get current local time in given timezone
   const fmt = new Intl.DateTimeFormat("en-GB", {
-    timeZone: tz, hour: "2-digit", minute: "2-digit", year:"numeric", month:"2-digit", day:"2-digit", hour12: false
+    timeZone: tz, hour: "2-digit", minute: "2-digit", year:"numeric", month:"2-digit", day:"2-digit", weekday:"short", hour12: false
   });
   const parts = Object.fromEntries(fmt.formatToParts(new Date()).map(p => [p.type, p.value]));
   const date = `${parts.year}-${parts.month}-${parts.day}`;
   const minutes = parseInt(parts.hour)*60 + parseInt(parts.minute);
-  return { date, minutes };
+  const weekday = (parts.weekday||"").toLowerCase(); // "fri", "sat", ...
+  return { date, minutes, weekday };
 }
 
 async function setSetting(key: string, value: string){
@@ -87,7 +88,9 @@ async function getOpenLogs(employeeIds: string[]){
 
 async function processBranch(branchKey: string, s: Record<string,string>){
   const tz = branchKey === "tripoli" ? "Africa/Tripoli" : "Africa/Cairo";
-  const { date, minutes } = nowInTZ(tz);
+  const { date, minutes, weekday } = nowInTZ(tz);
+  // Friday is the official weekly holiday (Libyan system) — no alerts, no auto-checkout
+  if (weekday === "fri") return { skipped:true, reason:"Friday holiday" };
   const start = s[`branch_${branchKey}_start`];
   const end   = s[`branch_${branchKey}_end`];
   if (!start || !end) return { skipped:true };

@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.04.30.8';
+const APP_VERSION = '2026.04.30.9';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -398,6 +398,7 @@ async function initDashboard(){
   wireRequestModal();
   loadMyRequests();
   showShiftInfo();
+  showFridayBanner();
   showCareBanner();
   ensureNotifyPermission().then(ok => { if (ok) subscribeToPush(); checkNotifStatus(); });
   setTimeout(checkNotifStatus, 1500);
@@ -643,6 +644,8 @@ function nowMinutes(){
 
 async function runShiftAlerts(){
   if (!state.user || state.user.is_admin) return;
+  // Friday is official holiday — skip all shift alerts
+  if (new Date().getDay() === 5) return;
   try {
     const s = await loadSettings();
     const branches = branchesFromSettings(s);
@@ -674,6 +677,25 @@ async function runShiftAlerts(){
       } catch(_){}
     }
   } catch(_){}
+}
+
+function showFridayBanner(){
+  const banner = document.getElementById('friday-banner');
+  if (!banner) return;
+  const day = new Date().getDay(); // 0=Sun, 5=Fri, 6=Sat
+  if (day === 5) {
+    banner.classList.remove('hidden');
+    // Hide shift-info on Friday (no work today)
+    const si = document.getElementById('shift-info'); if (si) si.classList.add('hidden');
+    // Disable check-in button on Friday
+    const btn = document.getElementById('btn-clock');
+    if (btn && !state.currentLog) {
+      btn.classList.add('opacity-60');
+      btn.style.pointerEvents = 'none';
+      const hint = document.getElementById('clock-hint');
+      if (hint) hint.textContent = 'اليوم عطلة الجمعة';
+    }
+  }
 }
 
 async function showCareBanner(){
