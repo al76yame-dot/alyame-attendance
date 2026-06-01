@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.05.10.2';
+const APP_VERSION = '2026.05.10.3';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -1155,11 +1155,46 @@ function exportReport(){
   URL.revokeObjectURL(url);
 }
 
-// Summary PDF - just the table
-async function exportReportPDF(){
+// Opens report in new window and triggers print dialog (user chooses "Save as PDF")
+function openPrintWindow(title, bodyHtml){
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) return alert('المتصفح يمنع فتح النوافذ — اسمح بالنوافذ المنبثقة لهذا الموقع ثم حاول مجدداً');
+  w.document.open();
+  w.document.write(`<!doctype html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<title>${title}</title>
+<style>
+  @page { size: A4; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Tahoma, Arial, "Segoe UI", sans-serif; margin:0; color:#222; background:#fff; line-height:1.4 }
+  table { border-collapse: collapse; width: 100%; }
+  .no-print { display:block; position:sticky; top:0; background:#00355f; color:#fff; padding:12px; text-align:center; z-index:100 }
+  .no-print button { background:#fff; color:#00355f; border:0; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer; margin:0 4px; font-size:14px }
+  @media print { .no-print { display:none !important } }
+  .avoid-break { page-break-inside: avoid; }
+</style>
+</head>
+<body>
+<div class="no-print">
+  <span style="font-weight:bold;margin-end:12px">جاهز للطباعة / حفظ كـ PDF</span>
+  <button onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+  <button onclick="window.close()">إغلاق</button>
+</div>
+${bodyHtml}
+<script>
+  // Auto-trigger print after a moment
+  setTimeout(() => { try { window.print(); } catch(e){} }, 800);
+<\/script>
+</body></html>`);
+  w.document.close();
+}
+
+// Summary PDF
+function exportReportPDF(){
   const d = window._reportData;
-  if (!d || !d.rows.length) return alert('لا توجد بيانات');
-  if (!window.html2pdf) return alert('مكتبة PDF لم تُحمَّل، تحقق من الإنترنت');
+  if (!d || !d.rows.length) return alert('لا توجد بيانات. اضغط "عرض" أولاً');
   const monthLabel = new Date(d.ym+'-01').toLocaleDateString('ar-LY',{month:'long',year:'numeric'});
   const totalH = Math.floor(d.totalMins/60), totalM = d.totalMins%60;
   const autoPct = d.totalLogs ? Math.round(d.totalAuto/d.totalLogs*100) : 0;
@@ -1167,29 +1202,30 @@ async function exportReportPDF(){
     const h = Math.floor(s.mins/60), mm = s.mins%60;
     const avg = s.days.size ? Math.round(s.mins/s.days.size) : 0;
     const ah = Math.floor(avg/60), am = avg%60;
-    return `<tr style="border-bottom:1px solid #eee">
-      <td style="padding:8px 6px;text-align:center">${i+1}</td>
-      <td style="padding:8px 6px"><b>${s.name}</b><br><span style="font-size:10px;color:#888">${ROLE_AR[s.role]||s.role||''}</span></td>
-      <td style="padding:8px 6px;font-size:11px">${s.branch}</td>
-      <td style="padding:8px 6px;text-align:center">${s.days.size}</td>
-      <td style="padding:8px 6px;text-align:center;font-weight:bold;color:#00355f">${h}س ${String(mm).padStart(2,'0')}د</td>
-      <td style="padding:8px 6px;text-align:center;font-size:11px">${ah}س ${String(am).padStart(2,'0')}د</td>
-      <td style="padding:8px 6px;text-align:center;color:${s.auto>=5?'#c62828':s.auto>=2?'#e65100':'#666'};font-weight:${s.auto>=5?'bold':'normal'}">${s.auto}</td>
+    const autoColor = s.auto>=5?'#c62828':s.auto>=2?'#e65100':'#666';
+    return `<tr>
+      <td style="padding:8px 6px;border-bottom:1px solid #eee;text-align:center">${i+1}</td>
+      <td style="padding:8px 6px;border-bottom:1px solid #eee"><b>${s.name}</b><br><span style="font-size:11px;color:#888">${ROLE_AR[s.role]||s.role||''}</span></td>
+      <td style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px">${s.branch}</td>
+      <td style="padding:8px 6px;border-bottom:1px solid #eee;text-align:center">${s.days.size}</td>
+      <td style="padding:8px 6px;border-bottom:1px solid #eee;text-align:center;font-weight:bold;color:#00355f">${h}س ${String(mm).padStart(2,'0')}د</td>
+      <td style="padding:8px 6px;border-bottom:1px solid #eee;text-align:center;font-size:12px">${ah}س ${String(am).padStart(2,'0')}د</td>
+      <td style="padding:8px 6px;border-bottom:1px solid #eee;text-align:center;color:${autoColor};font-weight:${s.auto>=5?'bold':'normal'}">${s.auto}</td>
     </tr>`;
   }).join('');
-  const html = `<div dir="rtl" style="font-family:Tahoma,Arial;padding:24px;color:#222">
-    <div style="background:linear-gradient(135deg,#00355f,#0f4c81);color:#fff;padding:20px;border-radius:8px;text-align:center;margin-bottom:20px">
+  const body = `<div style="padding:16px">
+    <div style="background:linear-gradient(135deg,#00355f,#0f4c81,#003a3d);color:#fff;padding:24px;border-radius:12px;text-align:center;margin-bottom:20px">
       <h1 style="margin:0;font-size:22px">📊 تقرير الحضور الشهري</h1>
       <p style="margin:6px 0 0;font-size:14px">شركة اليامي للسفر والسياحة</p>
-      <p style="margin:4px 0 0;font-size:16px;font-weight:bold">${monthLabel}</p>
+      <p style="margin:4px 0 0;font-size:18px;font-weight:bold">${monthLabel}</p>
     </div>
-    <table style="width:100%;margin-bottom:20px"><tr>
-      <td style="width:25%;padding:4px"><div style="background:#e3f2fd;padding:12px;border-radius:6px;text-align:center"><div style="font-size:10px;color:#1565c0">السجلات</div><div style="font-size:22px;font-weight:bold;color:#0d47a1">${d.totalLogs}</div></div></td>
-      <td style="width:25%;padding:4px"><div style="background:#e0f2f1;padding:12px;border-radius:6px;text-align:center"><div style="font-size:10px;color:#00695c">الساعات</div><div style="font-size:18px;font-weight:bold;color:#004d40">${totalH}س ${String(totalM).padStart(2,'0')}د</div></div></td>
-      <td style="width:25%;padding:4px"><div style="background:#fff3e0;padding:12px;border-radius:6px;text-align:center"><div style="font-size:10px;color:#e65100">الموظفون</div><div style="font-size:22px;font-weight:bold;color:#bf360c">${d.rows.length}</div></div></td>
-      <td style="width:25%;padding:4px"><div style="background:#ffebee;padding:12px;border-radius:6px;text-align:center"><div style="font-size:10px;color:#c62828">انصراف تلقائي</div><div style="font-size:18px;font-weight:bold;color:#b71c1c">${d.totalAuto} (${autoPct}%)</div></div></td>
+    <table style="margin-bottom:16px"><tr>
+      <td style="width:25%;padding:4px"><div style="background:#e3f2fd;padding:14px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#1565c0;font-weight:bold">السجلات</div><div style="font-size:24px;font-weight:bold;color:#0d47a1">${d.totalLogs}</div></div></td>
+      <td style="width:25%;padding:4px"><div style="background:#e0f2f1;padding:14px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#00695c;font-weight:bold">الساعات</div><div style="font-size:18px;font-weight:bold;color:#004d40">${totalH}س ${String(totalM).padStart(2,'0')}د</div></div></td>
+      <td style="width:25%;padding:4px"><div style="background:#fff3e0;padding:14px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#e65100;font-weight:bold">الموظفون</div><div style="font-size:24px;font-weight:bold;color:#bf360c">${d.rows.length}</div></div></td>
+      <td style="width:25%;padding:4px"><div style="background:#ffebee;padding:14px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#c62828;font-weight:bold">انصراف تلقائي</div><div style="font-size:18px;font-weight:bold;color:#b71c1c">${d.totalAuto} (${autoPct}%)</div></div></td>
     </tr></table>
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <table style="font-size:12px">
       <thead><tr style="background:#00355f;color:#fff">
         <th style="padding:10px 6px;text-align:center">#</th>
         <th style="padding:10px 6px;text-align:start">الموظف</th>
@@ -1201,32 +1237,15 @@ async function exportReportPDF(){
       </tr></thead>
       <tbody>${rowsHtml}</tbody>
     </table>
-    <p style="margin-top:20px;font-size:10px;color:#888;text-align:center">© ${new Date().getFullYear()} شركة اليامي للسفر والسياحة · تم التوليد ${new Date().toLocaleString('en-GB')}</p>
+    <p style="margin-top:24px;font-size:10px;color:#888;text-align:center">© ${new Date().getFullYear()} شركة اليامي للسفر والسياحة · تم التوليد ${new Date().toLocaleString('en-GB')}</p>
   </div>`;
-  const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px';
-  wrapper.innerHTML = html;
-  document.body.appendChild(wrapper);
-  try {
-    await html2pdf().set({
-      margin:[10,10,10,10],
-      filename:`alyame_report_${d.ym}.pdf`,
-      image:{type:'jpeg',quality:0.95},
-      html2canvas:{scale:2,useCORS:true,letterRendering:true},
-      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
-      pagebreak:{mode:['avoid-all','css','legacy']}
-    }).from(wrapper).save();
-  } finally {
-    wrapper.remove();
-  }
+  openPrintWindow(`alyame_report_${d.ym}`, body);
 }
 
 // Detailed PDF - per-employee daily breakdown
 async function exportDetailedPDF(){
   const d = window._reportData;
-  if (!d || !d.rows.length) return alert('لا توجد بيانات');
-  if (!window.html2pdf) return alert('مكتبة PDF لم تُحمَّل');
-
+  if (!d || !d.rows.length) return alert('لا توجد بيانات. اضغط "عرض" أولاً');
   const ym = d.ym;
   const [y, mm] = ym.split('-').map(Number);
   const start = new Date(Date.UTC(y, mm-1, 1)).toISOString();
@@ -1268,7 +1287,7 @@ async function exportDetailedPDF(){
         <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;font-size:14px">${(l.note||'').includes('تلقائياً')?'<span style="color:#c62828">⚠</span>':'<span style="color:#2e7d32">✓</span>'}</td>
       </tr>`).join('');
     }).join('');
-    return `<div style="margin:16px 0;page-break-inside:avoid;border:1px solid #ddd;border-radius:8px;overflow:hidden">
+    return `<div class="avoid-break" style="margin:16px 0;border:1px solid #ddd;border-radius:8px;overflow:hidden">
       <div style="background:linear-gradient(135deg,#00355f,#0f4c81);color:#fff;padding:12px 14px">
         <table style="width:100%"><tr>
           <td>
@@ -1302,7 +1321,7 @@ async function exportDetailedPDF(){
     </div>`;
   }).join('');
 
-  const html = `<div dir="rtl" style="font-family:Tahoma,Arial;padding:16px;color:#222">
+  const body = `<div style="padding:12px">
     <div style="background:linear-gradient(135deg,#00355f,#0f4c81,#003a3d);color:#fff;padding:24px;border-radius:12px;text-align:center;margin-bottom:16px">
       <h1 style="margin:0;font-size:22px">📊 تقرير الحضور المفصّل</h1>
       <p style="margin:6px 0 0">شركة اليامي للسفر والسياحة</p>
@@ -1311,23 +1330,7 @@ async function exportDetailedPDF(){
     ${sections}
     <p style="margin-top:20px;font-size:10px;color:#888;text-align:center">© ${new Date().getFullYear()} شركة اليامي · ${new Date().toLocaleString('en-GB')}</p>
   </div>`;
-
-  const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px';
-  wrapper.innerHTML = html;
-  document.body.appendChild(wrapper);
-  try {
-    await html2pdf().set({
-      margin:[8,8,10,8],
-      filename:`alyame_detailed_${ym}.pdf`,
-      image:{type:'jpeg',quality:0.92},
-      html2canvas:{scale:1.5,useCORS:true,letterRendering:true},
-      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
-      pagebreak:{mode:['avoid-all','css','legacy']}
-    }).from(wrapper).save();
-  } finally {
-    wrapper.remove();
-  }
+  openPrintWindow(`alyame_detailed_${ym}`, body);
 }
 
 async function loadReportEmail(){
