@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.05.10.1';
+const APP_VERSION = '2026.05.10.2';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -1155,6 +1155,181 @@ function exportReport(){
   URL.revokeObjectURL(url);
 }
 
+// Summary PDF - just the table
+async function exportReportPDF(){
+  const d = window._reportData;
+  if (!d || !d.rows.length) return alert('لا توجد بيانات');
+  if (!window.html2pdf) return alert('مكتبة PDF لم تُحمَّل، تحقق من الإنترنت');
+  const monthLabel = new Date(d.ym+'-01').toLocaleDateString('ar-LY',{month:'long',year:'numeric'});
+  const totalH = Math.floor(d.totalMins/60), totalM = d.totalMins%60;
+  const autoPct = d.totalLogs ? Math.round(d.totalAuto/d.totalLogs*100) : 0;
+  const rowsHtml = d.rows.map((s,i) => {
+    const h = Math.floor(s.mins/60), mm = s.mins%60;
+    const avg = s.days.size ? Math.round(s.mins/s.days.size) : 0;
+    const ah = Math.floor(avg/60), am = avg%60;
+    return `<tr style="border-bottom:1px solid #eee">
+      <td style="padding:8px 6px;text-align:center">${i+1}</td>
+      <td style="padding:8px 6px"><b>${s.name}</b><br><span style="font-size:10px;color:#888">${ROLE_AR[s.role]||s.role||''}</span></td>
+      <td style="padding:8px 6px;font-size:11px">${s.branch}</td>
+      <td style="padding:8px 6px;text-align:center">${s.days.size}</td>
+      <td style="padding:8px 6px;text-align:center;font-weight:bold;color:#00355f">${h}س ${String(mm).padStart(2,'0')}د</td>
+      <td style="padding:8px 6px;text-align:center;font-size:11px">${ah}س ${String(am).padStart(2,'0')}د</td>
+      <td style="padding:8px 6px;text-align:center;color:${s.auto>=5?'#c62828':s.auto>=2?'#e65100':'#666'};font-weight:${s.auto>=5?'bold':'normal'}">${s.auto}</td>
+    </tr>`;
+  }).join('');
+  const html = `<div dir="rtl" style="font-family:Tahoma,Arial;padding:24px;color:#222">
+    <div style="background:linear-gradient(135deg,#00355f,#0f4c81);color:#fff;padding:20px;border-radius:8px;text-align:center;margin-bottom:20px">
+      <h1 style="margin:0;font-size:22px">📊 تقرير الحضور الشهري</h1>
+      <p style="margin:6px 0 0;font-size:14px">شركة اليامي للسفر والسياحة</p>
+      <p style="margin:4px 0 0;font-size:16px;font-weight:bold">${monthLabel}</p>
+    </div>
+    <table style="width:100%;margin-bottom:20px"><tr>
+      <td style="width:25%;padding:4px"><div style="background:#e3f2fd;padding:12px;border-radius:6px;text-align:center"><div style="font-size:10px;color:#1565c0">السجلات</div><div style="font-size:22px;font-weight:bold;color:#0d47a1">${d.totalLogs}</div></div></td>
+      <td style="width:25%;padding:4px"><div style="background:#e0f2f1;padding:12px;border-radius:6px;text-align:center"><div style="font-size:10px;color:#00695c">الساعات</div><div style="font-size:18px;font-weight:bold;color:#004d40">${totalH}س ${String(totalM).padStart(2,'0')}د</div></div></td>
+      <td style="width:25%;padding:4px"><div style="background:#fff3e0;padding:12px;border-radius:6px;text-align:center"><div style="font-size:10px;color:#e65100">الموظفون</div><div style="font-size:22px;font-weight:bold;color:#bf360c">${d.rows.length}</div></div></td>
+      <td style="width:25%;padding:4px"><div style="background:#ffebee;padding:12px;border-radius:6px;text-align:center"><div style="font-size:10px;color:#c62828">انصراف تلقائي</div><div style="font-size:18px;font-weight:bold;color:#b71c1c">${d.totalAuto} (${autoPct}%)</div></div></td>
+    </tr></table>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#00355f;color:#fff">
+        <th style="padding:10px 6px;text-align:center">#</th>
+        <th style="padding:10px 6px;text-align:start">الموظف</th>
+        <th style="padding:10px 6px;text-align:start">الفرع</th>
+        <th style="padding:10px 6px;text-align:center">أيام</th>
+        <th style="padding:10px 6px;text-align:center">الساعات</th>
+        <th style="padding:10px 6px;text-align:center">متوسط/يوم</th>
+        <th style="padding:10px 6px;text-align:center">انصراف تلقائي</th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <p style="margin-top:20px;font-size:10px;color:#888;text-align:center">© ${new Date().getFullYear()} شركة اليامي للسفر والسياحة · تم التوليد ${new Date().toLocaleString('en-GB')}</p>
+  </div>`;
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px';
+  wrapper.innerHTML = html;
+  document.body.appendChild(wrapper);
+  try {
+    await html2pdf().set({
+      margin:[10,10,10,10],
+      filename:`alyame_report_${d.ym}.pdf`,
+      image:{type:'jpeg',quality:0.95},
+      html2canvas:{scale:2,useCORS:true,letterRendering:true},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+      pagebreak:{mode:['avoid-all','css','legacy']}
+    }).from(wrapper).save();
+  } finally {
+    wrapper.remove();
+  }
+}
+
+// Detailed PDF - per-employee daily breakdown
+async function exportDetailedPDF(){
+  const d = window._reportData;
+  if (!d || !d.rows.length) return alert('لا توجد بيانات');
+  if (!window.html2pdf) return alert('مكتبة PDF لم تُحمَّل');
+
+  const ym = d.ym;
+  const [y, mm] = ym.split('-').map(Number);
+  const start = new Date(Date.UTC(y, mm-1, 1)).toISOString();
+  const end = new Date(Date.UTC(y, mm, 1)).toISOString();
+  // Fetch all logs for the month
+  const allLogs = await sb(`att_logs?check_in=gte.${start}&check_in=lt.${end}&order=check_in.asc&select=employee_id,check_in,check_out,duration_min,location_in,note,att_employees!att_logs_employee_id_fkey(name,role,branch,phone)`);
+  // Group by employee + day
+  const byEmp = {};
+  for (const l of (allLogs||[])){
+    const e = l.att_employees||{};
+    if (!byEmp[l.employee_id]) byEmp[l.employee_id] = {name:e.name||'?',role:e.role||'',branch:e.branch||'',phone:e.phone||'',days:{},logs:[],mins:0,auto:0};
+    byEmp[l.employee_id].logs.push(l);
+    const dk = l.check_in.slice(0,10);
+    if (!byEmp[l.employee_id].days[dk]) byEmp[l.employee_id].days[dk] = [];
+    byEmp[l.employee_id].days[dk].push(l);
+    if (l.duration_min) byEmp[l.employee_id].mins += l.duration_min;
+    if ((l.note||'').includes('تلقائياً')) byEmp[l.employee_id].auto++;
+  }
+  const employees = Object.values(byEmp).sort((a,b)=>b.mins-a.mins);
+  const monthLabel = new Date(ym+'-01').toLocaleDateString('ar-LY',{month:'long',year:'numeric'});
+
+  const fmtTime = s => { const dt = new Date(s); return dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false}); };
+  const dayName = s => new Date(s).toLocaleDateString('ar-LY',{weekday:'long'});
+  const fmtDur = m => m ? Math.floor(m/60)+'س '+String(m%60).padStart(2,'0')+'د' : '—';
+
+  const sections = employees.map((e,idx) => {
+    const totalH = Math.floor(e.mins/60), totalM = e.mins%60;
+    const dayKeys = Object.keys(e.days).sort();
+    const avg = dayKeys.length ? Math.round(e.mins/dayKeys.length) : 0;
+    const autoRate = e.logs.length ? Math.round(e.auto/e.logs.length*100) : 0;
+    const dayRows = dayKeys.map(dk => {
+      const entries = e.days[dk];
+      return entries.map((l,i) => `<tr style="font-size:11px">
+        ${i===0?`<td rowspan="${entries.length}" style="padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top;font-weight:bold;color:#00355f">${dk}<br><span style="font-size:9px;color:#888;font-weight:normal">${dayName(l.check_in)}</span></td>`:''}
+        <td style="padding:6px 8px;border-bottom:1px solid #eee" dir="ltr">${fmtTime(l.check_in)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee" dir="ltr">${l.check_out?fmtTime(l.check_out):'—'}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee">${fmtDur(l.duration_min)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:10px;color:#666">${(l.location_in||'').slice(0,30)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;font-size:14px">${(l.note||'').includes('تلقائياً')?'<span style="color:#c62828">⚠</span>':'<span style="color:#2e7d32">✓</span>'}</td>
+      </tr>`).join('');
+    }).join('');
+    return `<div style="margin:16px 0;page-break-inside:avoid;border:1px solid #ddd;border-radius:8px;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#00355f,#0f4c81);color:#fff;padding:12px 14px">
+        <table style="width:100%"><tr>
+          <td>
+            <div style="font-size:11px;opacity:.85">#${idx+1} · ${ROLE_AR[e.role]||e.role||''}</div>
+            <div style="font-size:15px;font-weight:bold">${e.name}</div>
+            <div style="font-size:10px;opacity:.85" dir="ltr">${e.phone||''} · ${e.branch}</div>
+          </td>
+          <td style="text-align:end">
+            <div style="font-size:18px;font-weight:bold">${totalH}<span style="font-size:11px">س ${String(totalM).padStart(2,'0')}د</span></div>
+            <div style="font-size:9px;opacity:.85">إجمالي</div>
+          </td>
+        </tr></table>
+        <table style="width:100%;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.2);font-size:10px"><tr>
+          <td style="text-align:center"><b>${dayKeys.length}</b><br><span style="opacity:.8">أيام</span></td>
+          <td style="text-align:center"><b>${e.logs.length}</b><br><span style="opacity:.8">سجلات</span></td>
+          <td style="text-align:center"><b>${fmtDur(avg)}</b><br><span style="opacity:.8">متوسط</span></td>
+          <td style="text-align:center"><b>${e.auto} (${autoRate}%)</b><br><span style="opacity:.8">تلقائي</span></td>
+        </tr></table>
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:#f5f5f5;font-size:10px">
+          <th style="padding:8px 6px;text-align:start">التاريخ</th>
+          <th style="padding:8px 6px;text-align:start">الحضور</th>
+          <th style="padding:8px 6px;text-align:start">الانصراف</th>
+          <th style="padding:8px 6px;text-align:start">المدة</th>
+          <th style="padding:8px 6px;text-align:start">الموقع</th>
+          <th style="padding:8px 6px;text-align:center">النوع</th>
+        </tr></thead>
+        <tbody>${dayRows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+
+  const html = `<div dir="rtl" style="font-family:Tahoma,Arial;padding:16px;color:#222">
+    <div style="background:linear-gradient(135deg,#00355f,#0f4c81,#003a3d);color:#fff;padding:24px;border-radius:12px;text-align:center;margin-bottom:16px">
+      <h1 style="margin:0;font-size:22px">📊 تقرير الحضور المفصّل</h1>
+      <p style="margin:6px 0 0">شركة اليامي للسفر والسياحة</p>
+      <p style="margin:4px 0 0;font-size:18px;font-weight:bold">${monthLabel}</p>
+    </div>
+    ${sections}
+    <p style="margin-top:20px;font-size:10px;color:#888;text-align:center">© ${new Date().getFullYear()} شركة اليامي · ${new Date().toLocaleString('en-GB')}</p>
+  </div>`;
+
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px';
+  wrapper.innerHTML = html;
+  document.body.appendChild(wrapper);
+  try {
+    await html2pdf().set({
+      margin:[8,8,10,8],
+      filename:`alyame_detailed_${ym}.pdf`,
+      image:{type:'jpeg',quality:0.92},
+      html2canvas:{scale:1.5,useCORS:true,letterRendering:true},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+      pagebreak:{mode:['avoid-all','css','legacy']}
+    }).from(wrapper).save();
+  } finally {
+    wrapper.remove();
+  }
+}
+
 async function loadReportEmail(){
   const s = await loadSettings();
   const el = document.getElementById('rep-email');
@@ -1737,5 +1912,5 @@ function wireCommon(){
   });
 }
 
-window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, sendPushNow, sendTestPushToMe, resetTodayAlerts, enableNotifications, showNotifGuide, loadReport, exportReport, sendMonthlyEmail, state };
+window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, sendPushNow, sendTestPushToMe, resetTodayAlerts, enableNotifications, showNotifGuide, loadReport, exportReport, exportReportPDF, exportDetailedPDF, sendMonthlyEmail, state };
 })();

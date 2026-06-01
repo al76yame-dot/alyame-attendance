@@ -43,6 +43,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="assets/tailwind-config.js"></script>
 <style>
   body { font-family: "Tajawal","Plus Jakarta Sans",sans-serif; min-height: 100dvh; }
@@ -229,6 +230,12 @@
       </button>
       <button onclick="App.exportReport()" class="h-10 px-4 bg-tertiary text-white font-bold rounded-lg flex items-center gap-1">
         <span class="material-symbols-outlined text-[18px]">download</span>CSV
+      </button>
+      <button onclick="App.exportReportPDF()" class="h-10 px-4 bg-error text-white font-bold rounded-lg flex items-center gap-1">
+        <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>PDF
+      </button>
+      <button onclick="App.exportDetailedPDF()" class="h-10 px-4 bg-secondary text-white font-bold rounded-lg flex items-center gap-1">
+        <span class="material-symbols-outlined text-[18px]">description</span>PDF مفصّل
       </button>
     </div>
 
@@ -524,7 +531,7 @@
   </a>
 </nav>
 
-<script src="assets/app.js?v=2026.05.10.1"></script>
+<script src="assets/app.js?v=2026.05.10.2"></script>
 <script>App.initAdmin();</script>
 </body>
 </html>
