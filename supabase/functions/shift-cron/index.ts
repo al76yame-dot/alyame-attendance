@@ -182,6 +182,24 @@ async function processBranch(branchKey: string, s: Record<string,string>){
     if (auto > 0){
       const targets = open.map((l: any) => l.employee_id);
       await sendPushToEmployees(targets, "✅ انصراف تلقائي", `تم تسجيل انصرافك تلقائياً بعد 30 دقيقة من نهاية الدوام (${end}).`, `auto-out-${branchKey}-${date}`);
+
+      // Forgetfulness streak: notify admins if employee has 3+ auto-outs in last 7 days
+      const sevenDaysAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString();
+      const { data: admins } = await supa.from("att_employees").select("id").eq("is_admin", true).eq("active", true);
+      const adminIds = (admins||[]).map((a: any) => a.id);
+      for (const empId of targets) {
+        const { data: recent } = await supa.from("att_logs").select("id, note")
+          .eq("employee_id", empId).gte("check_in", sevenDaysAgo);
+        const autoCount = (recent||[]).filter((r: any) => (r.note||"").includes("تلقائياً")).length;
+        if (autoCount >= 3 && adminIds.length) {
+          const { data: empData } = await supa.from("att_employees").select("name").eq("id", empId).single();
+          await sendPushToEmployees(adminIds,
+            "⚠️ تكرار نسيان الانصراف",
+            `${empData?.name||"موظف"} نسي تسجيل الانصراف ${autoCount} مرات خلال آخر 7 أيام.`,
+            `forget-${empId}-${date}`
+          );
+        }
+      }
     }
     await setSetting(autoKey, "1");
     results.sent.auto = auto;

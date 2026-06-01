@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.04.30.9';
+const APP_VERSION = '2026.05.10.1';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -1065,6 +1065,126 @@ async function sendPushNow(){
   } catch(e){ alert('فشل: '+e.message); }
 }
 
+// ============= Monthly Reports =============
+const ROLE_AR = {bookings:'حجوزات تذاكر/فنادق',visas:'تأشيرات',finance:'مالي',delegate:'مندوب',manager:'مدير',agent:'موظف حجوزات',guide:'مرشد',driver:'سائق'};
+
+async function loadReport(){
+  const monthEl = document.getElementById('rep-month');
+  if (!monthEl) return;
+  const ym = monthEl.value || new Date().toISOString().slice(0,7);
+  const [y,m] = ym.split('-').map(Number);
+  const start = new Date(Date.UTC(y, m-1, 1)).toISOString();
+  const end   = new Date(Date.UTC(y, m, 1)).toISOString();
+  document.getElementById('rep-table').innerHTML = `<tr><td colspan="6" class="p-6 text-center text-outline">جاري التحميل...</td></tr>`;
+  let logs;
+  try {
+    logs = await sb(`att_logs?check_in=gte.${start}&check_in=lt.${end}&order=check_in.asc&select=employee_id,check_in,duration_min,note,att_employees!att_logs_employee_id_fkey(name,role,branch,active)`);
+  } catch(e){
+    document.getElementById('rep-table').innerHTML = `<tr><td colspan="6" class="p-6 text-error">فشل: ${e.message}</td></tr>`;
+    return;
+  }
+  // Aggregate
+  const sum = {};
+  let totalMins = 0, totalAuto = 0;
+  for (const l of (logs||[])){
+    const e = l.att_employees||{};
+    if (!sum[l.employee_id]) sum[l.employee_id] = { name:e.name||'?', role:e.role||'', branch:e.branch||'', days:new Set(), mins:0, auto:0, logs:0 };
+    const s = sum[l.employee_id];
+    s.logs++;
+    if (l.duration_min) { s.mins += l.duration_min; totalMins += l.duration_min; }
+    s.days.add(l.check_in.slice(0,10));
+    if ((l.note||'').includes('تلقائياً')) { s.auto++; totalAuto++; }
+  }
+  const rows = Object.values(sum).sort((a,b)=>b.mins-a.mins);
+  window._reportData = { ym, rows, totalMins, totalAuto, totalLogs: logs?.length||0 };
+  // Summary cards
+  const totalH = Math.floor(totalMins/60), totalM = totalMins%60;
+  const autoPct = logs?.length ? Math.round(totalAuto/logs.length*100) : 0;
+  document.getElementById('rep-summary').innerHTML = `
+    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30">
+      <p class="text-xs text-outline">إجمالي السجلات</p>
+      <p class="text-2xl font-extrabold text-primary">${logs?.length||0}</p>
+    </div>
+    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30">
+      <p class="text-xs text-outline">إجمالي الساعات</p>
+      <p class="text-2xl font-extrabold text-tertiary">${totalH}h ${String(totalM).padStart(2,'0')}m</p>
+    </div>
+    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30">
+      <p class="text-xs text-outline">عدد الموظفين النشطين</p>
+      <p class="text-2xl font-extrabold text-secondary">${rows.length}</p>
+    </div>
+    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30">
+      <p class="text-xs text-outline">انصراف تلقائي</p>
+      <p class="text-2xl font-extrabold text-error">${totalAuto} <span class="text-sm opacity-70">(${autoPct}%)</span></p>
+    </div>`;
+  // Table
+  document.getElementById('rep-count').textContent = `${rows.length} موظف`;
+  document.getElementById('rep-table').innerHTML = rows.map(s => {
+    const h = Math.floor(s.mins/60), mm = s.mins%60;
+    const avg = s.days.size ? Math.round(s.mins/s.days.size) : 0;
+    const ah = Math.floor(avg/60), am = avg%60;
+    const autoColor = s.auto>=5?'text-error font-bold':s.auto>=2?'text-secondary':'text-on-surface-variant';
+    return `<tr class="border-b border-outline-variant/20">
+      <td class="p-3">
+        <p class="font-bold">${s.name}</p>
+        <p class="text-xs text-outline">${ROLE_AR[s.role]||s.role}</p>
+      </td>
+      <td class="p-3 text-xs">${s.branch}</td>
+      <td class="p-3 text-center">${s.days.size}</td>
+      <td class="p-3 text-center font-bold text-primary">${h}h ${String(mm).padStart(2,'0')}m</td>
+      <td class="p-3 text-center text-xs">${ah}h ${String(am).padStart(2,'0')}m</td>
+      <td class="p-3 text-center ${autoColor}">${s.auto}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="6" class="p-6 text-center text-outline">لا توجد بيانات</td></tr>`;
+}
+
+function exportReport(){
+  const d = window._reportData;
+  if (!d || !d.rows.length) return alert('لا توجد بيانات');
+  const csv = [['Employee','Role','Branch','Days','Total Hours','Average/Day','Auto Check-out','Logs']];
+  for (const s of d.rows){
+    const h = Math.floor(s.mins/60), mm = s.mins%60;
+    const avg = s.days.size ? Math.round(s.mins/s.days.size) : 0;
+    const ah = Math.floor(avg/60), am = avg%60;
+    csv.push([s.name, ROLE_AR[s.role]||s.role, s.branch, s.days.size, `${h}h ${mm}m`, `${ah}h ${am}m`, s.auto, s.logs]);
+  }
+  const text = csv.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿'+text],{type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=`alyame_report_${d.ym}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function loadReportEmail(){
+  const s = await loadSettings();
+  const el = document.getElementById('rep-email');
+  if (el) el.value = s.report_email || '';
+}
+
+async function sendMonthlyEmail(){
+  const email = document.getElementById('rep-email').value.trim();
+  if (!email) return alert('أدخل البريد الإلكتروني');
+  // Save email to settings
+  try {
+    await sb('att_settings', {
+      method:'POST',
+      headers:{ 'Prefer':'resolution=merge-duplicates,return=minimal' },
+      body:[{ key:'report_email', value:email }]
+    });
+  } catch(_){}
+  const month = document.getElementById('rep-month').value || new Date().toISOString().slice(0,7);
+  try {
+    const r = await fetch(`${SB_URL}/functions/v1/monthly-report`, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+SB_KEY, 'apikey':SB_KEY },
+      body: JSON.stringify({ email, month })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error||'failed');
+    alert(`✅ تم إرسال التقرير إلى ${email}`);
+  } catch(e){ alert('فشل: '+e.message); }
+}
+
 function useMyLocation(branch){
   if (!navigator.geolocation) return alert('GPS غير متاح');
   navigator.geolocation.getCurrentPosition(p => {
@@ -1348,6 +1468,12 @@ function switchTab(tab){
   if (tab==='livemap') loadLiveMap();
   if (tab==='requests') loadAdminRequests(window._reqFilter||'pending');
   if (tab==='settings') loadAdminSettings();
+  if (tab==='reports') {
+    const m = document.getElementById('rep-month');
+    if (m && !m.value) m.value = new Date().toISOString().slice(0,7);
+    loadReport();
+    loadReportEmail();
+  }
 }
 
 async function refreshStats(){
@@ -1611,5 +1737,5 @@ function wireCommon(){
   });
 }
 
-window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, sendPushNow, sendTestPushToMe, resetTodayAlerts, enableNotifications, showNotifGuide, state };
+window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, sendPushNow, sendTestPushToMe, resetTodayAlerts, enableNotifications, showNotifGuide, loadReport, exportReport, sendMonthlyEmail, state };
 })();

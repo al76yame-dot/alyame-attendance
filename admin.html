@@ -164,6 +164,10 @@
       <span>الطلبات</span>
       <span id="req-pending-badge" class="hidden ms-1 px-1.5 py-0.5 bg-error text-white text-[10px] rounded-full">0</span>
     </button>
+    <button data-tab="reports" class="px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap bg-surface-container text-on-surface-variant flex items-center gap-1.5">
+      <span class="material-symbols-outlined text-[18px]">analytics</span>
+      <span>التقارير</span>
+    </button>
     <button data-tab="settings" class="px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap bg-surface-container text-on-surface-variant flex items-center gap-1.5">
       <span class="material-symbols-outlined text-[18px]">settings</span>
       <span>الإعدادات</span>
@@ -215,6 +219,56 @@
   </section>
 
   <!-- Settings tab -->
+  <!-- Reports tab -->
+  <section data-tabpane="reports" class="hidden space-y-4">
+    <div class="flex flex-wrap gap-2 items-center">
+      <h3 class="text-lg font-bold text-primary">تقرير شهري / Monthly Report</h3>
+      <input id="rep-month" type="month" class="ms-auto h-10 px-3 border rounded-lg" dir="ltr"/>
+      <button onclick="App.loadReport()" class="h-10 px-4 bg-primary text-white font-bold rounded-lg flex items-center gap-1">
+        <span class="material-symbols-outlined text-[18px]">refresh</span>عرض
+      </button>
+      <button onclick="App.exportReport()" class="h-10 px-4 bg-tertiary text-white font-bold rounded-lg flex items-center gap-1">
+        <span class="material-symbols-outlined text-[18px]">download</span>CSV
+      </button>
+    </div>
+
+    <div id="rep-summary" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+
+    <div class="bg-white rounded-2xl border border-outline-variant/30 overflow-hidden">
+      <div class="p-4 border-b border-outline-variant/30 flex items-center justify-between">
+        <h4 class="font-bold text-primary">حسب الموظف</h4>
+        <span id="rep-count" class="text-xs text-outline"></span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-surface-container-low text-on-surface-variant">
+            <tr>
+              <th class="text-start p-3">الموظف</th>
+              <th class="text-start p-3">الفرع</th>
+              <th class="text-center p-3">أيام</th>
+              <th class="text-center p-3">الساعات</th>
+              <th class="text-center p-3">متوسط/يوم</th>
+              <th class="text-center p-3">انصراف تلقائي</th>
+            </tr>
+          </thead>
+          <tbody id="rep-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30">
+      <h4 class="font-bold text-primary mb-3">📧 إرسال التقرير بالبريد</h4>
+      <div class="flex gap-2 items-end flex-wrap">
+        <div class="flex-1 min-w-[200px]">
+          <label class="text-xs">بريد المستلم</label>
+          <input id="rep-email" type="email" placeholder="admin@alyame.ly" class="w-full h-11 px-3 border rounded-lg" dir="ltr"/>
+        </div>
+        <button onclick="App.sendMonthlyEmail()" class="h-11 px-4 bg-primary text-white font-bold rounded-lg">إرسال الآن</button>
+      </div>
+      <p class="text-[11px] text-outline mt-2">يُرسل التقرير الشهري تلقائياً في أول كل شهر إلى هذا البريد.</p>
+    </div>
+  </section>
+
   <section data-tabpane="settings" class="hidden space-y-4">
     <h3 class="text-lg font-bold text-primary">إعدادات الموقع / Location Settings</h3>
     <p class="text-sm text-on-surface-variant">حدد موقع كل فرع — لن يستطيع الموظف تسجيل الحضور إلا داخل النطاق المحدد إذا فعّلت الفرض الإلزامي.</p>
@@ -470,7 +524,7 @@
   </a>
 </nav>
 
-<script src="assets/app.js?v=2026.04.30.9"></script>
+<script src="assets/app.js?v=2026.05.10.1"></script>
 <script>App.initAdmin();</script>
 </body>
 </html>
