@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.05.10.3';
+const APP_VERSION = '2026.05.10.4';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -275,6 +275,7 @@ async function checkIn(loc){
   };
   const r = await sb('att_logs', { method:'POST', body });
   state.currentLog = r[0];
+  notifyAdminsOfCheck('in', loc).catch(()=>null);
   return state.currentLog;
 }
 
@@ -293,7 +294,35 @@ async function checkOut(loc){
   await sb(`att_logs?id=eq.${state.currentLog.id}`, { method:'PATCH', body });
   const done = { ...state.currentLog, ...body };
   state.currentLog = null;
+  notifyAdminsOfCheck('out', loc, mins).catch(()=>null);
   return done;
+}
+
+// Notify all admins when an employee checks in/out (professional summary)
+async function notifyAdminsOfCheck(kind, loc, durMin){
+  if (!state.user || state.user.is_admin) return; // don't notify on admin's own actions
+  try {
+    // Check if admins want these notifications (default true)
+    const s = await loadSettings();
+    if (s.notify_admin_on_check === 'false') return;
+    const admins = await sb('att_employees?is_admin=eq.true&active=eq.true&select=id');
+    const adminIds = (admins||[]).map(a => a.id);
+    if (!adminIds.length) return;
+    const time = new Date().toLocaleTimeString('en-GB',{timeZone:'Africa/Tripoli',hour:'2-digit',minute:'2-digit',hour12:false});
+    const where = loc?.name ? `📍 ${loc.name}` : '📍 موقع غير محدد';
+    const role = state.user.role ? `[${t('role.'+state.user.role)}] ` : '';
+    const branch = state.user.branch ? ` · ${state.user.branch}` : '';
+    let title, body;
+    if (kind === 'in'){
+      title = `🟢 حضور: ${state.user.name}`;
+      body = `${role}${time}${branch}\n${where}`;
+    } else {
+      const h = Math.floor((durMin||0)/60), m = (durMin||0)%60;
+      title = `🔴 انصراف: ${state.user.name}`;
+      body = `${role}${time}${branch}\n⏱️ ${h}س ${String(m).padStart(2,'0')}د\n${where}`;
+    }
+    await sendBroadcastPush(title, body, adminIds);
+  } catch(_){}
 }
 
 async function myLogs(limit=50){
@@ -995,6 +1024,8 @@ async function loadAdminSettings(){
   set('set-cairo-start',    s.branch_cairo_start    || '09:00');
   set('set-cairo-end',      s.branch_cairo_end      || '17:00');
   document.getElementById('set-enforce').checked = s.geofence_enforce === 'true';
+  const notifyEl = document.getElementById('set-notify-check');
+  if (notifyEl) notifyEl.checked = (s.notify_admin_on_check || 'true') === 'true';
   set('set-vapid', s.vapid_public_key || '');
   set('set-care-title', s.care_title || '');
   document.getElementById('set-care-msg').value = s.care_msg || '';
@@ -1019,6 +1050,7 @@ async function saveSettings(){
     { key:'branch_cairo_start',      value:v('set-cairo-start') || '09:00' },
     { key:'branch_cairo_end',        value:v('set-cairo-end')   || '17:00' },
     { key:'geofence_enforce',        value:document.getElementById('set-enforce').checked ? 'true':'false' },
+    { key:'notify_admin_on_check',   value:(document.getElementById('set-notify-check')?.checked) ? 'true':'false' },
     { key:'care_title',              value:v('set-care-title') || '' },
     { key:'care_msg',                value:document.getElementById('set-care-msg').value || '' },
     { key:'care_active',             value:document.getElementById('set-care-active').checked ? 'true':'false' },

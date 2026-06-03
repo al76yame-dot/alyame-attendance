@@ -340,10 +340,14 @@
       </div>
     </div>
 
-    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30">
+    <div class="bg-white p-4 rounded-2xl border border-outline-variant/30 space-y-3">
       <label class="flex items-center gap-3 cursor-pointer">
         <input id="set-enforce" type="checkbox" class="w-5 h-5"/>
         <span class="text-sm font-semibold">فرض الموقع — منع التسجيل خارج نطاق المكتب</span>
+      </label>
+      <label class="flex items-center gap-3 cursor-pointer pt-3 border-t border-outline-variant/30">
+        <input id="set-notify-check" type="checkbox" class="w-5 h-5"/>
+        <span class="text-sm font-semibold">إشعاري عند تسجيل أي موظف للحضور/الانصراف</span>
       </label>
     </div>
 
@@ -531,7 +535,7 @@
   </a>
 </nav>
 
-<script src="assets/app.js?v=2026.05.10.3"></script>
+<script src="assets/app.js?v=2026.05.10.4"></script>
 <script>App.initAdmin();</script>
 </body>
 </html>
