@@ -119,23 +119,34 @@ async function processBranch(branchKey: string, s: Record<string,string>){
     results.sent.in = sent;
   }
 
-  // Late check-in nudge: 15 min after shift start (for those who haven't clocked in)
-  const lateInKey = `alert_${branchKey}_latein_${date}`;
-  if (Math.abs(minutes - (startM+15)) <= 2 && s[lateInKey] !== "1") {
-    // Find employees who DON'T have an open log today
-    const open = await getOpenLogs(empIds);
-    const openSet = new Set(open.map((l: any) => l.employee_id));
-    // Check if any have any log today
-    const startToday = new Date();
-    startToday.setUTCHours(0,0,0,0);
-    const { data: todayLogs } = await supa.from("att_logs").select("employee_id").gte("check_in", startToday.toISOString()).in("employee_id", empIds);
-    const checkedInToday = new Set((todayLogs||[]).map((l: any) => l.employee_id));
-    const missing = empIds.filter(id => !checkedInToday.has(id));
-    if (missing.length) {
-      const sent = await sendPushToEmployees(missing, "⚠️ لم تسجّل حضورك بعد", `مرّت 15 دقيقة على بداية الدوام. سجّل حضورك الآن.`, `late-in-${branchKey}-${date}`);
-      results.sent.lateIn = sent;
+  // Repeating late check-in reminders: every 15 min for 1 hour after shift start
+  // Fires at +15, +30, +45, +60 — only to employees who STILL haven't checked in today.
+  // Stops automatically once the employee registers (they won't be in the "missing" list).
+  for (const offset of [15, 30, 45, 60]) {
+    const lateInKey = `alert_${branchKey}_latein${offset}_${date}`;
+    if (Math.abs(minutes - (startM + offset)) <= 2 && s[lateInKey] !== "1") {
+      // Find employees who have NO log today (not checked in)
+      const startToday = new Date();
+      startToday.setUTCHours(0, 0, 0, 0);
+      const { data: todayLogs } = await supa.from("att_logs")
+        .select("employee_id").gte("check_in", startToday.toISOString()).in("employee_id", empIds);
+      const checkedInToday = new Set((todayLogs || []).map((l: any) => l.employee_id));
+      const missing = empIds.filter(id => !checkedInToday.has(id));
+      if (missing.length) {
+        const remaining = 60 - offset; // minutes left in the reminder window
+        const tail = offset >= 60
+          ? "هذا آخر تذكير. سجّل حضورك الآن."
+          : `سيتكرر التذكير كل 15 دقيقة (${remaining} دقيقة متبقية).`;
+        const sent = await sendPushToEmployees(
+          missing,
+          "⚠️ لم تسجّل حضورك بعد",
+          `مرّت ${offset} دقيقة على بداية الدوام (${start}). ${tail}`,
+          `late-in-${offset}-${branchKey}-${date}`
+        );
+        results.sent[`lateIn${offset}`] = sent;
+      }
+      await setSetting(lateInKey, "1");
     }
-    await setSetting(lateInKey, "1");
   }
 
   // Pre-check-out reminder: 15 min before shift end

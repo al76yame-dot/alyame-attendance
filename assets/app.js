@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.05.10.4';
+const APP_VERSION = '2026.05.10.5';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -684,10 +684,26 @@ async function runShiftAlerts(){
     const endM = timeToMinutes(b.end);
     const now = nowMinutes();
 
-    // Check-in reminder: from shift start until +60 min, only if not clocked in
-    if (startM!=null && now >= startM && now < startM+60 && !state.currentLog && !alertedToday('in')) {
-      markAlerted('in');
-      showAlert('🔔 وقت الحضور / Check-in', `بدأ دوامك الآن (${b.start}). سجّل حضورك.`);
+    // Check-in reminders: repeat every 15 min for the first hour, until the employee checks in.
+    // Fires at start, +15, +30, +45, +60 — stops once clocked in.
+    if (startM != null && !state.currentLog) {
+      for (const offset of [0, 15, 30, 45, 60]) {
+        const slotKey = 'in' + offset;
+        if (now >= startM + offset && now < startM + offset + 15 && !alertedToday(slotKey)) {
+          markAlerted(slotKey);
+          const remaining = 60 - offset;
+          const tail = offset === 0
+            ? 'سجّل حضورك الآن.'
+            : offset >= 60
+              ? 'هذا آخر تذكير. سجّل حضورك الآن.'
+              : `سيتكرر التذكير كل 15 دقيقة (${remaining} دقيقة متبقية).`;
+          const head = offset === 0
+            ? `بدأ دوامك الآن (${b.start}).`
+            : `مرّت ${offset} دقيقة على بداية الدوام (${b.start}).`;
+          showAlert('🔔 وقت الحضور / Check-in', `${head} ${tail}`);
+          break; // only one alert per tick
+        }
+      }
     }
 
     // Check-out reminder: at shift end, only if still clocked in
