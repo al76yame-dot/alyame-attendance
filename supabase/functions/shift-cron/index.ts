@@ -219,13 +219,51 @@ async function processBranch(branchKey: string, s: Record<string,string>){
   return results;
 }
 
+// Daily digest (once at ~09:00 Tripoli time): notify admins of employees
+// who still haven't enabled notifications.
+async function dailyNotifDigest(s: Record<string,string>){
+  const { date, minutes, weekday } = nowInTZ("Africa/Tripoli");
+  if (weekday === "fri") return { skipped: "friday" };
+  // Fire only in the 09:00–09:02 window, once per day
+  if (Math.abs(minutes - 9*60) > 2) return { skipped: "not 09:00" };
+  const flag = `digest_notif_${date}`;
+  if (s[flag] === "1") return { skipped: "already sent" };
+
+  // Active non-admin employees
+  const { data: emps } = await supa.from("att_employees")
+    .select("id,name,branch").eq("active", true).eq("is_admin", false);
+  // Who has push subscriptions
+  const { data: subs } = await supa.from("att_push_subs").select("employee_id");
+  const hasSub = new Set((subs||[]).map((x: any) => x.employee_id));
+  const missing = (emps||[]).filter((e: any) => !hasSub.has(e.id));
+
+  // Admins to notify
+  const { data: admins } = await supa.from("att_employees")
+    .select("id").eq("is_admin", true).eq("active", true);
+  const adminIds = (admins||[]).map((a: any) => a.id);
+
+  let sent = 0;
+  if (missing.length && adminIds.length) {
+    const names = missing.map((e: any) => `• ${e.name} (${e.branch||"-"})`).join("\n");
+    sent = await sendPushToEmployees(
+      adminIds,
+      `🔕 ${missing.length} موظف بدون إشعارات`,
+      `لم يفعّلوا الإشعارات بعد:\n${names}`,
+      `digest-${date}`
+    );
+  }
+  await setSetting(flag, "1");
+  return { missing: missing.length, sent };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     const s = await getSettings();
     const r1 = await processBranch("tripoli", s);
     const r2 = await processBranch("cairo", s);
-    return new Response(JSON.stringify({ tripoli: r1, cairo: r2, ts: new Date().toISOString() }), {
+    const digest = await dailyNotifDigest(s);
+    return new Response(JSON.stringify({ tripoli: r1, cairo: r2, digest, ts: new Date().toISOString() }), {
       headers: { ...corsHeaders, "Content-Type":"application/json" }
     });
   } catch(e: any){
