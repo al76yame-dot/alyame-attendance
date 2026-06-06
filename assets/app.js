@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.05.10.5';
+const APP_VERSION = '2026.05.10.6';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -10,6 +10,21 @@ const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(()=>null);
+  });
+  // Persist auto-renewed subscriptions sent from the Service Worker
+  navigator.serviceWorker.addEventListener('message', async (e) => {
+    if (e.data && e.data.type === 'resubscribe' && e.data.subscription) {
+      try {
+        const j = e.data.subscription;
+        const u = JSON.parse(localStorage.getItem('alyame_sess') || 'null');
+        if (!u) return;
+        await sb('att_push_subs?on_conflict=endpoint', {
+          method:'POST',
+          headers:{ 'Prefer':'resolution=merge-duplicates,return=minimal' },
+          body:{ employee_id:u.id, endpoint:j.endpoint, p256dh:j.keys.p256dh, auth:j.keys.auth, user_agent:navigator.userAgent.slice(0,200) }
+        });
+      } catch(_){}
+    }
   });
 }
 
@@ -558,15 +573,26 @@ async function enableNotifications(){
   } catch(_){}
 }
 
-async function subscribeToPush(){
+async function subscribeToPush(force){
   try {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-    if (Notification.permission !== 'granted') return;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+    if (Notification.permission !== 'granted') return false;
     const s = await loadSettings();
     const vapid = s.vapid_public_key;
-    if (!vapid) return; // not configured yet
+    if (!vapid) return false; // not configured yet
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
+
+    // Force-refresh stale subscriptions (push endpoints can silently die,
+    // especially on iOS/Safari after ~weeks). Re-subscribe if older than 7 days.
+    const LAST = 'alyame_push_refreshed';
+    const lastRefresh = parseInt(localStorage.getItem(LAST) || '0');
+    const isStale = (Date.now() - lastRefresh) > 7*24*60*60*1000;
+
+    if (sub && (force || isStale)) {
+      try { await sub.unsubscribe(); } catch(_){}
+      sub = null;
+    }
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
@@ -581,13 +607,14 @@ async function subscribeToPush(){
       auth: json.keys.auth,
       user_agent: navigator.userAgent.slice(0,200)
     };
-    // upsert by endpoint
     await sb('att_push_subs?on_conflict=endpoint', {
       method:'POST',
       headers:{ 'Prefer':'resolution=merge-duplicates,return=minimal' },
       body
     });
-  } catch(e){ console.warn('push subscribe failed', e); }
+    localStorage.setItem(LAST, String(Date.now()));
+    return true;
+  } catch(e){ console.warn('push subscribe failed', e); return false; }
 }
 
 async function sendBroadcastPush(title, body, employee_ids){
@@ -1723,6 +1750,13 @@ async function loadEmployees(){
   list.innerHTML = `<div class="p-6 text-center text-outline col-span-full">...</div>`;
   const emps = await sb('att_employees?order=created_at.desc');
   if (!emps?.length) { list.innerHTML = `<div class="p-10 text-center bg-white rounded-2xl border border-dashed text-outline col-span-full">${t('admin.empty')}</div>`; return; }
+  // Fetch which employees have active push subscriptions
+  let pushSet = new Set();
+  try {
+    const subs = await sb('att_push_subs?select=employee_id');
+    pushSet = new Set((subs||[]).map(s => s.employee_id));
+  } catch(_){}
+  window._pushSet = pushSet;
   list.innerHTML = emps.map(empCard).join('');
   list.querySelectorAll('[data-emp-edit]').forEach(b => b.onclick = () => {
     const e = emps.find(x=>x.id===b.dataset.empEdit); openEmpModal(e);
@@ -1747,6 +1781,11 @@ function empCard(e){
           <p class="text-xs ${sub}">${t('role.'+e.role)} ${e.branch?'· '+e.branch:''}</p>
         </div>
         <span class="w-2.5 h-2.5 rounded-full ${e.active?'bg-tertiary-container':'bg-outline'}"></span>
+      </div>
+      <div class="flex items-center gap-2 ${e.is_admin?'text-white/90':''}">
+        ${(window._pushSet && window._pushSet.has(e.id))
+          ? `<span class="text-[10px] flex items-center gap-1 px-2 py-0.5 rounded-full ${e.is_admin?'bg-white/20':'bg-tertiary-fixed text-tertiary'}"><span class="material-symbols-outlined text-[14px]">notifications_active</span>الإشعارات مفعّلة</span>`
+          : `<span class="text-[10px] flex items-center gap-1 px-2 py-0.5 rounded-full ${e.is_admin?'bg-white/20':'bg-error-container text-error'}"><span class="material-symbols-outlined text-[14px]">notifications_off</span>إشعارات غير مفعّلة</span>`}
       </div>
       <div class="flex items-center justify-between pt-2 border-t ${e.is_admin?'border-white/20':'border-outline-variant/30'}">
         <span class="text-xs ${sub} font-mono" dir="ltr">${e.phone}</span>

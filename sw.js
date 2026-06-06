@@ -41,3 +41,24 @@ self.addEventListener('notificationclick', e => {
     if (clients.openWindow) return clients.openWindow('./dashboard.html');
   }));
 });
+
+// Auto re-subscribe when the push subscription expires/rotates.
+// The browser fires this when an endpoint dies — we silently create a new one.
+self.addEventListener('pushsubscriptionchange', e => {
+  e.waitUntil((async () => {
+    try {
+      const oldSub = e.oldSubscription || (await self.registration.pushManager.getSubscription());
+      const appServerKey = oldSub && oldSub.options ? oldSub.options.applicationServerKey : null;
+      if (!appServerKey) return;
+      const newSub = await self.registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: appServerKey
+      });
+      // Notify any open client to persist the new subscription
+      const clientsList = await self.clients.matchAll({ includeUncontrolled: true });
+      for (const c of clientsList) {
+        c.postMessage({ type: 'resubscribe', subscription: newSub.toJSON() });
+      }
+    } catch (_) {}
+  })());
+});
