@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.05.10.6';
+const APP_VERSION = '2026.05.10.7';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -523,11 +523,32 @@ function urlBase64ToUint8Array(base64String){
   return out;
 }
 
+function isIOS(){
+  return /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+function isStandalone(){
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
 async function checkNotifStatus(){
   const banner = document.getElementById('notif-banner');
   if (!banner) return;
+
+  // iOS-specific: notifications ONLY work when installed to home screen
+  if (isIOS() && !isStandalone()) {
+    banner.innerHTML = `<div class="flex items-start gap-3">
+      <span class="material-symbols-outlined text-3xl">ios_share</span>
+      <div class="flex-1 min-w-0">
+        <h4 class="font-bold mb-0.5">📱 لتفعيل الإشعارات على iPhone</h4>
+        <p class="text-xs opacity-95">١) اضغط زر المشاركة ⬆️ في Safari<br>٢) اختر "إضافة إلى الشاشة الرئيسية"<br>٣) افتح التطبيق من الأيقونة الجديدة وفعّل الإشعارات</p>
+      </div>
+    </div>`;
+    banner.classList.remove('hidden');
+    return;
+  }
+
   if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-    // Unsupported browser — show different message
     banner.innerHTML = `<div class="flex items-center gap-3"><span class="material-symbols-outlined text-3xl">warning</span><div class="flex-1"><h4 class="font-bold mb-0.5">المتصفح لا يدعم الإشعارات</h4><p class="text-xs opacity-95">استخدم Chrome على Android، أو ثبّت التطبيق على الشاشة الرئيسية على iPhone</p></div></div>`;
     banner.classList.remove('hidden');
     return;
@@ -543,6 +564,24 @@ async function checkNotifStatus(){
     } catch { needsBanner = true; }
   }
   banner.classList.toggle('hidden', !needsBanner);
+
+  // If notifications are active, show a small self-test button instead
+  const testBtn = document.getElementById('notif-test-btn');
+  if (testBtn) testBtn.classList.toggle('hidden', needsBanner);
+}
+
+// Employee self-test: send a push to own devices to verify delivery
+async function testMyNotification(){
+  if (Notification.permission !== 'granted') { return enableNotifications(); }
+  await subscribeToPush(true); // force-refresh subscription first
+  try {
+    const r = await sendBroadcastPush('🔔 اختبار الإشعار', 'إذا وصلك هذا الإشعار، فالنظام يعمل لديك بنجاح ✅', [state.user.id]);
+    if (r.sent > 0) {
+      toast(`تم إرسال إشعار اختبار إلى ${r.sent} جهاز`, 'success');
+    } else {
+      toast('لا يوجد جهاز مشترك — أعد تفعيل الإشعارات', 'error');
+    }
+  } catch(e){ toast('فشل الاختبار: '+e.message, 'error'); }
 }
 
 function showNotifGuide(){
@@ -2002,5 +2041,5 @@ function wireCommon(){
   });
 }
 
-window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, sendPushNow, sendTestPushToMe, resetTodayAlerts, enableNotifications, showNotifGuide, loadReport, exportReport, exportReportPDF, exportDetailedPDF, sendMonthlyEmail, state };
+window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, sendPushNow, sendTestPushToMe, resetTodayAlerts, enableNotifications, showNotifGuide, testMyNotification, loadReport, exportReport, exportReportPDF, exportDetailedPDF, sendMonthlyEmail, state };
 })();

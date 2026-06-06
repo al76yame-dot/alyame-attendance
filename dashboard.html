@@ -150,6 +150,12 @@
     </div>
   </div>
 
+  <!-- Notification self-test button (shown when notifications are active) -->
+  <button id="notif-test-btn" onclick="App.testMyNotification()" class="hidden mb-4 w-full p-3 rounded-2xl bg-tertiary-fixed text-tertiary font-semibold flex items-center justify-center gap-2 active:scale-[0.99]">
+    <span class="material-symbols-outlined text-[20px]">notifications_active</span>
+    اختبر وصول الإشعارات لجهازك
+  </button>
+
   <!-- Notification Help Modal -->
   <div id="notif-guide" class="hidden fixed inset-0 z-[200] flex items-end lg:items-center justify-center p-0 lg:p-6 bg-black/60 backdrop-blur-sm">
     <div class="bg-white w-full lg:max-w-md rounded-t-3xl lg:rounded-3xl max-h-[90vh] overflow-y-auto">
@@ -385,7 +391,7 @@
   </a>
 </nav>
 
-<script src="assets/app.js?v=2026.05.10.6"></script>
+<script src="assets/app.js?v=2026.05.10.7"></script>
 <script>App.initDashboard();</script>
 </body>
 </html>
