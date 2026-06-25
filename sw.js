@@ -27,18 +27,33 @@ self.addEventListener('message', e => {
 
 self.addEventListener('push', e => {
   let data = { title:'حضور اليامي', body:'لديك تنبيه جديد' };
-  try { if (e.data) data = e.data.json(); } catch(_){}
-  e.waitUntil(self.registration.showNotification(data.title, {
-    body: data.body || '', icon:'assets/logo.png', badge:'assets/logo.png',
-    vibrate:[400,200,400,200,400], tag: data.tag||'alyame'
-  }));
+  try {
+    if (e.data) {
+      try { data = e.data.json(); }
+      catch(_) { data = { title:'حضور اليامي', body: e.data.text() || 'لديك تنبيه جديد' }; }
+    }
+  } catch(_){}
+  // Always show a notification (iOS/Android require userVisibleOnly — must display something)
+  e.waitUntil(
+    self.registration.showNotification(data.title || 'حضور اليامي', {
+      body: data.body || '',
+      icon: 'assets/logo.png',
+      badge: 'assets/logo.png',
+      vibrate: [400,200,400,200,400],
+      tag: data.tag || ('alyame-' + Date.now()),
+      renotify: true,
+      requireInteraction: true,
+      data: { url: data.url || './dashboard.html' }
+    }).catch(() => self.registration.showNotification('حضور اليامي', { body:'لديك تنبيه جديد', icon:'assets/logo.png' }))
+  );
 });
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  e.waitUntil(clients.matchAll({ type:'window' }).then(list => {
+  const url = (e.notification.data && e.notification.data.url) || './dashboard.html';
+  e.waitUntil(clients.matchAll({ type:'window', includeUncontrolled:true }).then(list => {
     for (const c of list) { if ('focus' in c) return c.focus(); }
-    if (clients.openWindow) return clients.openWindow('./dashboard.html');
+    if (clients.openWindow) return clients.openWindow(url);
   }));
 });
 
