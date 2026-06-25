@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.05.10.7';
+const APP_VERSION = '2026.05.10.8';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -940,6 +940,40 @@ async function loadMyRequests(){
       ${r.admin_note?`<div class="mt-2 p-2 bg-primary-fixed text-primary rounded-lg"><p class="text-xs font-bold mb-0.5">📩 رد المدير:</p><p class="text-sm">${r.admin_note}</p></div>`:''}
     </div>`;
   }).join('');
+
+  showDecidedRequestPopup(rows);
+}
+
+function showDecidedRequestPopup(rows){
+  const modal = document.getElementById('req-result-modal');
+  if (!modal) return;
+  const SEEN = 'alyame_seen_decisions';
+  let seen = [];
+  try { seen = JSON.parse(localStorage.getItem(SEEN) || '[]'); } catch(_){}
+  const decided = (rows||[]).filter(r => (r.status==='approved' || r.status==='rejected') && r.decided_at && !seen.includes(r.id));
+  if (!decided.length) return;
+  decided.sort((a,b)=> new Date(b.decided_at) - new Date(a.decided_at));
+  const r = decided[0];
+  const approved = r.status==='approved';
+  const typeText = r.type==='leave' ? 'إجازة' : 'إذن';
+  document.getElementById('rr-head').style.background = approved
+    ? 'linear-gradient(135deg,#003a3d,#2e7d32)'
+    : 'linear-gradient(135deg,#a53b22,#c62828)';
+  document.getElementById('rr-icon').textContent = approved ? '✅' : '❌';
+  document.getElementById('rr-title').textContent = approved ? `تم قبول طلب ${typeText}` : `تم رفض طلب ${typeText}`;
+  document.getElementById('rr-type').textContent = approved ? 'وافقت الإدارة على طلبك' : 'لم توافق الإدارة على طلبك';
+  document.getElementById('rr-dates').textContent =
+    `📅 ${r.start_date}${r.end_date?' → '+r.end_date:''}` +
+    (r.start_time?`  ⏰ ${r.start_time}${r.end_time?' → '+r.end_time:''}`:'');
+  const noteBox = document.getElementById('rr-note-box');
+  if (r.admin_note) {
+    document.getElementById('rr-note').textContent = r.admin_note;
+    noteBox.classList.remove('hidden');
+  } else { noteBox.classList.add('hidden'); }
+  modal.classList.remove('hidden');
+  try { beep(2); vibrate([300,150,300]); } catch(_){}
+  const allDecided = (rows||[]).filter(x => x.decided_at).map(x => x.id);
+  localStorage.setItem(SEEN, JSON.stringify(allDecided));
 }
 
 // ============= Admin: Requests management =============

@@ -120,6 +120,25 @@
 </header>
 
 <main class="lg:ms-64 pt-20 lg:pt-6 px-4 lg:px-8 pb-6 max-w-6xl mx-auto lg:mx-0">
+  <!-- Request Decision Popup -->
+  <div id="req-result-modal" class="hidden fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div class="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl">
+      <div id="rr-head" class="p-6 text-center text-white">
+        <div id="rr-icon" class="text-5xl mb-2">✓</div>
+        <h3 id="rr-title" class="text-xl font-extrabold">—</h3>
+        <p id="rr-type" class="text-sm opacity-90 mt-1">—</p>
+      </div>
+      <div class="p-5 space-y-3">
+        <div id="rr-dates" class="text-sm text-center text-on-surface-variant" dir="ltr">—</div>
+        <div id="rr-note-box" class="hidden p-3 bg-surface-container-low rounded-xl">
+          <p class="text-xs font-bold text-outline mb-1">📩 رد المدير / السبب:</p>
+          <p id="rr-note" class="text-sm text-on-surface">—</p>
+        </div>
+        <button onclick="document.getElementById('req-result-modal').classList.add('hidden')" class="w-full h-12 bg-primary text-white font-bold rounded-xl">حسناً، فهمت</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Friday Greeting Banner -->
   <div id="friday-banner" class="hidden mb-4 p-5 rounded-2xl bg-gradient-to-l from-tertiary to-primary text-white shadow-lg text-center">
     <div class="flex items-center justify-center gap-3 mb-1">
@@ -391,7 +410,7 @@
   </a>
 </nav>
 
-<script src="assets/app.js?v=2026.05.10.7"></script>
+<script src="assets/app.js?v=2026.05.10.8"></script>
 <script>App.initDashboard();</script>
 </body>
 </html>
