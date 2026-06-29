@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.05.10.9';
+const APP_VERSION = '2026.05.10.10';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -182,16 +182,31 @@ function toast(msg, kind='success'){
 }
 
 // ============= Location =============
+let _lastGeoError = null;
 async function getLocation(){
-  return new Promise(res => {
-    if(!navigator.geolocation) return res(null);
+  _lastGeoError = null;
+  if(!navigator.geolocation){ _lastGeoError='unsupported'; return null; }
+  const tryGet = (opts) => new Promise(res => {
     navigator.geolocation.getCurrentPosition(
       p => res({lat:p.coords.latitude, lng:p.coords.longitude, accuracy:p.coords.accuracy}),
-      () => res(null),
-      { enableHighAccuracy:true, timeout:8000, maximumAge:30000 }
+      err => { _lastGeoError = err.code; res(null); },
+      opts
     );
   });
+  // 1st: high accuracy, generous timeout
+  let pos = await tryGet({ enableHighAccuracy:true, timeout:15000, maximumAge:30000 });
+  // 2nd: fall back to low accuracy (network/cell-based) if high accuracy failed
+  if (!pos) pos = await tryGet({ enableHighAccuracy:false, timeout:15000, maximumAge:60000 });
+  return pos;
 }
+function geoErrorText(){
+  if (_lastGeoError === 1) return 'تم رفض إذن الموقع — فعّله من إعدادات المتصفح';
+  if (_lastGeoError === 2) return 'تعذّر تحديد الموقع — تأكد أن GPS مفعّل';
+  if (_lastGeoError === 3) return 'انتهت مهلة تحديد الموقع — حاول في مكان مكشوف';
+  if (_lastGeoError === 'unsupported') return 'المتصفح لا يدعم تحديد الموقع';
+  return 'تعذّر تحديد الموقع';
+}
+function retryLocation(){ location.reload(); }
 async function reverse(lat,lng){
   try{
     const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&accept-language=${state.lang}`);
@@ -415,9 +430,10 @@ async function initDashboard(){
       L.circle([pos.lat, pos.lng], { radius: pos.accuracy||50, color:'#0f4c81', fillColor:'#8ebdf9', fillOpacity:0.15, weight:1 }).addTo(map);
     }
   } else {
-    locEl.textContent = t('verify.fail');
-    verEl.innerHTML = `<span class="text-error font-semibold">${t('verify.fail')}</span>`;
-    if (mapVisible) mapEl.innerHTML = `<div class="w-full h-full flex items-center justify-center text-outline text-sm">${t('verify.fail')}</div>`;
+    const msg = geoErrorText();
+    locEl.textContent = msg;
+    verEl.innerHTML = `<span class="text-error font-semibold">${msg}</span> <button onclick="App.retryLocation()" class="text-primary underline text-xs ms-1">إعادة المحاولة</button>`;
+    if (mapVisible) mapEl.innerHTML = `<div class="w-full h-full flex items-center justify-center text-outline text-sm p-3 text-center">${msg}</div>`;
   }
 
   // Clock button
@@ -2075,5 +2091,5 @@ function wireCommon(){
   });
 }
 
-window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, sendPushNow, sendTestPushToMe, resetTodayAlerts, enableNotifications, showNotifGuide, testMyNotification, loadReport, exportReport, exportReportPDF, exportDetailedPDF, sendMonthlyEmail, state };
+window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, sendPushNow, sendTestPushToMe, resetTodayAlerts, enableNotifications, showNotifGuide, testMyNotification, loadReport, exportReport, exportReportPDF, exportDetailedPDF, sendMonthlyEmail, retryLocation, state };
 })();
