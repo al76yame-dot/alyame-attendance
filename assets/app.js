@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.05.10.10';
+const APP_VERSION = '2026.05.10.11';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -399,6 +399,8 @@ async function initDashboard(){
     const ms = document.getElementById('map-section'); if (ms) ms.classList.remove('hidden');
     const dg = document.getElementById('dash-grid'); if (dg) dg.classList.add('lg:grid','lg:grid-cols-3');
     const dl = document.getElementById('dash-left'); if (dl) dl.classList.add('lg:col-span-2');
+  } else {
+    const lr = document.getElementById('location-row'); if (lr) lr.classList.add('hidden');
   }
 
   // Live clock
