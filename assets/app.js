@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.08.31.1';
+const APP_VERSION = '2026.08.31.2';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -462,16 +462,16 @@ async function initDashboard(){
   showShiftInfo();
   showFridayBanner();
   showCareBanner();
-  // Auto-prompt for notifications on every login until enabled (retries daily)
+  // Force notification setup on every open until it actually works
   (async () => {
-    const KEY = 'alyame_notif_prompt_day';
-    const today = new Date().toISOString().slice(0,10);
-    const already = Notification.permission === 'granted';
-    if (already) { await subscribeToPush(); }
-    else if (Notification.permission === 'default' && localStorage.getItem(KEY) !== today) {
-      localStorage.setItem(KEY, today);
+    if (!('Notification' in window)) { checkNotifStatus(); return; }
+    if (Notification.permission === 'granted') {
+      await subscribeToPush();
+    } else if (Notification.permission === 'default') {
       const ok = await ensureNotifyPermission();
       if (ok) await subscribeToPush();
+    } else if (Notification.permission === 'denied') {
+      setTimeout(showNotifGuide, 1200);
     }
     checkNotifStatus();
   })();
