@@ -37,10 +37,31 @@ async function setSetting(key: string, value: string){
 }
 
 async function getSettings(){
-  const { data } = await supa.from("att_settings").select("key,value");
   const m: Record<string,string> = {};
-  (data||[]).forEach((r: any) => m[r.key] = r.value);
+  // Config keys (branch_*, geofence_*, etc.) — never truncated by row limits
+  const { data: cfg, error } = await supa.from("att_settings")
+    .select("key,value").not("key", "like", "alert_%").limit(500);
+  if (error) throw new Error("settings read failed: " + error.message);
+  (cfg||[]).forEach((r: any) => m[r.key] = r.value);
+  // Today's alert flags only
+  const today = new Date().toISOString().slice(0,10);
+  const { data: flags } = await supa.from("att_settings")
+    .select("key,value").like("key", `%_${today}`).limit(200);
+  (flags||[]).forEach((r: any) => m[r.key] = r.value);
   return m;
+}
+
+// Housekeeping: delete alert flags older than 7 days so the table stays small
+function minutesOfHour(){ return new Date().getUTCMinutes(); }
+
+async function purgeOldAlertFlags(){
+  const cutoff = new Date(Date.now() - 7*24*60*60*1000).toISOString().slice(0,10);
+  const { data } = await supa.from("att_settings").select("key").like("key","alert_%").limit(2000);
+  const stale = (data||[])
+    .map((r: any) => r.key as string)
+    .filter(k => { const m = k.match(/(\d{4}-\d{2}-\d{2})$/); return m && m[1] < cutoff; });
+  for (const k of stale) await supa.from("att_settings").delete().eq("key", k);
+  return stale.length;
 }
 
 async function sendPushToEmployees(employeeIds: string[]|null, title: string, body: string, tag: string){
@@ -93,7 +114,7 @@ async function processBranch(branchKey: string, s: Record<string,string>){
   if (weekday === "fri") return { skipped:true, reason:"Friday holiday" };
   const start = s[`branch_${branchKey}_start`];
   const end   = s[`branch_${branchKey}_end`];
-  if (!start || !end) return { skipped:true };
+  if (!start || !end) return { skipped:true, reason:"missing times", start, end, keys: Object.keys(s).length };
   const [sh, sm] = start.split(":").map(Number);
   const [eh, em] = end.split(":").map(Number);
   const startM = sh*60 + (sm||0);
@@ -173,17 +194,23 @@ async function processBranch(branchKey: string, s: Record<string,string>){
     await setSetting(outKey, "1");
   }
 
-  // Auto check-out at shift end +30 (±2 min window) — combined notification + auto-out
+  // Auto check-out: runs on EVERY tick (not a narrow window) so nothing stays open forever.
+  // Closes any open log whose own shift-end + 30min has already passed.
   const autoKey = `alert_${branchKey}_auto_${date}`;
-  if (Math.abs(minutes - (endM+30)) <= 2 && s[autoKey] !== "1") {
+  if (minutes >= endM + 30) {
     const open = await getOpenLogs(empIds);
     let auto = 0;
-    const out = new Date(); // current UTC time
+    const out = new Date();
     for (const l of open) {
       const inT = new Date(l.check_in);
-      const dur = Math.floor((out.getTime() - inT.getTime())/60000);
+      // Close at that log's OWN shift end +30 (handles stale logs from previous days)
+      const inLocal = new Date(inT.toLocaleString("en-US", { timeZone: tz }));
+      const closeAt = new Date(inT);
+      closeAt.setUTCMinutes(closeAt.getUTCMinutes() + ((endM + 30) - (inLocal.getHours()*60 + inLocal.getMinutes())));
+      const closeTime = closeAt > out ? out : closeAt;
+      const dur = Math.floor((closeTime.getTime() - inT.getTime())/60000);
       await supa.from("att_logs").update({
-        check_out: out.toISOString(),
+        check_out: closeTime.toISOString(),
         duration_min: dur > 0 ? dur : 0,
         status: "completed",
         note: "تم تسجيل الانصراف تلقائياً بعد 30 دقيقة من نهاية الدوام"
@@ -212,7 +239,7 @@ async function processBranch(branchKey: string, s: Record<string,string>){
         }
       }
     }
-    await setSetting(autoKey, "1");
+    if (auto > 0) await setSetting(autoKey, "1");
     results.sent.auto = auto;
   }
 
@@ -263,6 +290,7 @@ Deno.serve(async (req) => {
     const r1 = await processBranch("tripoli", s);
     const r2 = await processBranch("cairo", s);
     const digest = await dailyNotifDigest(s);
+    const purged = (minutesOfHour() === 5) ? await purgeOldAlertFlags() : 0;
     return new Response(JSON.stringify({ tripoli: r1, cairo: r2, digest, ts: new Date().toISOString() }), {
       headers: { ...corsHeaders, "Content-Type":"application/json" }
     });

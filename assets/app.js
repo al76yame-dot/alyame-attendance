@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.05.10.11';
+const APP_VERSION = '2026.08.31.1';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -462,7 +462,19 @@ async function initDashboard(){
   showShiftInfo();
   showFridayBanner();
   showCareBanner();
-  ensureNotifyPermission().then(ok => { if (ok) subscribeToPush(); checkNotifStatus(); });
+  // Auto-prompt for notifications on every login until enabled (retries daily)
+  (async () => {
+    const KEY = 'alyame_notif_prompt_day';
+    const today = new Date().toISOString().slice(0,10);
+    const already = Notification.permission === 'granted';
+    if (already) { await subscribeToPush(); }
+    else if (Notification.permission === 'default' && localStorage.getItem(KEY) !== today) {
+      localStorage.setItem(KEY, today);
+      const ok = await ensureNotifyPermission();
+      if (ok) await subscribeToPush();
+    }
+    checkNotifStatus();
+  })();
   setTimeout(checkNotifStatus, 1500);
   runShiftAlerts();
   setInterval(runShiftAlerts, 60000);
