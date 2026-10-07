@@ -248,6 +248,22 @@ async function processBranch(branchKey: string, s: Record<string,string>){
 
 // Daily digest (once at ~09:00 Tripoli time): notify admins of employees
 // who still haven't enabled notifications.
+// Purge alert_*/digest_* flags older than 3 days — they accumulate daily and
+// eventually make att_settings slow enough to time out the whole function.
+async function purgeOldFlags(){
+  const { date, minutes } = nowInTZ("Africa/Tripoli");
+  if (Math.abs(minutes - 3*60) > 2) return { skipped: "not 03:00" };
+  const cutoff = new Date(Date.now() - 3*24*60*60*1000).toISOString().slice(0,10);
+  const { data } = await supa.from("att_settings").select("key");
+  const stale = (data||[])
+    .map((r: any) => r.key as string)
+    .filter(k => (k.startsWith("alert_") || k.startsWith("digest_")) && (k.match(/(\d{4}-\d{2}-\d{2})$/)?.[1] ?? "9999") < cutoff);
+  for (let i = 0; i < stale.length; i += 50) {
+    await supa.from("att_settings").delete().in("key", stale.slice(i, i+50));
+  }
+  return { purged: stale.length };
+}
+
 async function dailyNotifDigest(s: Record<string,string>){
   const { date, minutes, weekday } = nowInTZ("Africa/Tripoli");
   if (weekday === "fri") return { skipped: "friday" };
@@ -290,8 +306,8 @@ Deno.serve(async (req) => {
     const r1 = await processBranch("tripoli", s);
     const r2 = await processBranch("cairo", s);
     const digest = await dailyNotifDigest(s);
-    const purged = (minutesOfHour() === 5) ? await purgeOldAlertFlags() : 0;
-    return new Response(JSON.stringify({ tripoli: r1, cairo: r2, digest, ts: new Date().toISOString() }), {
+    const purge = await purgeOldFlags();
+    return new Response(JSON.stringify({ tripoli: r1, cairo: r2, digest, purge, ts: new Date().toISOString() }), {
       headers: { ...corsHeaders, "Content-Type":"application/json" }
     });
   } catch(e: any){
