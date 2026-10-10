@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.08.31.2';
+const APP_VERSION = '2026.10.10.1';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -193,18 +193,17 @@ async function getLocation(){
       opts
     );
   });
-  // 1st: high accuracy, generous timeout
-  let pos = await tryGet({ enableHighAccuracy:true, timeout:15000, maximumAge:30000 });
-  // 2nd: fall back to low accuracy (network/cell-based) if high accuracy failed
-  if (!pos) pos = await tryGet({ enableHighAccuracy:false, timeout:15000, maximumAge:60000 });
+  let pos = await tryGet({ enableHighAccuracy:true, timeout:10000, maximumAge:0 });
+  if (!pos) pos = await tryGet({ enableHighAccuracy:false, timeout:10000, maximumAge:0 });
   return pos;
 }
 function geoErrorText(){
-  if (_lastGeoError === 1) return 'تم رفض إذن الموقع — فعّله من إعدادات المتصفح';
-  if (_lastGeoError === 2) return 'تعذّر تحديد الموقع — تأكد أن GPS مفعّل';
-  if (_lastGeoError === 3) return 'انتهت مهلة تحديد الموقع — حاول في مكان مكشوف';
-  if (_lastGeoError === 'unsupported') return 'المتصفح لا يدعم تحديد الموقع';
-  return 'تعذّر تحديد الموقع';
+  const secure = window.isSecureContext ? '' : ' [الاتصال غير آمن]';
+  if (_lastGeoError === 1) return 'تم رفض إذن الموقع — اضغط القفل بجانب العنوان وفعّل "الموقع"'+secure;
+  if (_lastGeoError === 2) return 'الجهاز لم يستطع تحديد الموقع — فعّل GPS أو جرّب من الجوال'+secure;
+  if (_lastGeoError === 3) return 'انتهت المهلة — جرّب مكاناً مكشوفاً أو أعد المحاولة'+secure;
+  if (_lastGeoError === 'unsupported') return 'المتصفح لا يدعم تحديد الموقع'+secure;
+  return 'تعذّر تحديد الموقع (رمز: '+_lastGeoError+')'+secure;
 }
 function retryLocation(){ location.reload(); }
 async function reverse(lat,lng){
@@ -443,6 +442,17 @@ async function initDashboard(){
     const btn = document.getElementById('btn-clock'); btn.disabled=true;
     try {
       if (!state.currentLog) {
+        // Retry location at click time — the page-load attempt may have failed
+        // before the user granted permission or turned GPS on.
+        if (!state.location) {
+          const p = await getLocation();
+          if (p) {
+            p.name = await reverse(p.lat, p.lng) || `${p.lat.toFixed(3)}, ${p.lng.toFixed(3)}`;
+            state.location = p;
+            locEl.textContent = p.name;
+            verEl.innerHTML = `<span class="text-tertiary font-semibold">${t('verify.ok')}</span>`;
+          }
+        }
         const allowed = await checkGeofence(state.location);
         if (!allowed) { btn.disabled=false; return; }
         await checkIn(state.location);
