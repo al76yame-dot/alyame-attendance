@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.10.11.1';
+const APP_VERSION = '2026.10.11.2';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -444,6 +444,10 @@ async function initDashboard(){
   // Clock button
   document.getElementById('btn-clock').onclick = async () => {
     const btn = document.getElementById('btn-clock'); btn.disabled=true;
+    const hintEl = document.getElementById('clock-hint');
+    const prevHint = hintEl ? hintEl.textContent : '';
+    btn.classList.add('opacity-70');
+    if (hintEl) hintEl.textContent = 'جاري التسجيل...';
     try {
       if (!state.currentLog) {
         // Retry location at click time — the page-load attempt may have failed
@@ -458,7 +462,7 @@ async function initDashboard(){
           }
         }
         const allowed = await checkGeofence(state.location);
-        if (!allowed) { btn.disabled=false; return; }
+        if (!allowed) { btn.disabled=false; btn.classList.remove('opacity-70'); if (hintEl) hintEl.textContent = prevHint; return; }
         await checkIn(state.location);
         toast(t('toast.in'),'success');
       } else {
@@ -466,8 +470,12 @@ async function initDashboard(){
         toast(t('toast.out')+fmtDur(done.duration_min*60000),'info');
       }
       await renderDash();
-    } catch(e){ toast(t('toast.error'),'error'); }
+    } catch(e){
+      toast(t('toast.error')+': '+(e?.message||''),'error');
+      if (hintEl) hintEl.textContent = prevHint;
+    }
     btn.disabled=false;
+    btn.classList.remove('opacity-70');
   };
 
   // Wire request modal + load my requests + show shift + alerts
@@ -498,10 +506,13 @@ async function initDashboard(){
 }
 
 // ============= Settings / Geofence =============
-async function loadSettings(){
+let _settingsCache = null, _settingsAt = 0;
+async function loadSettings(force){
+  if (!force && _settingsCache && Date.now() - _settingsAt < 60000) return _settingsCache;
   const rows = await sb('att_settings?select=key,value');
   const map = {};
   (rows||[]).forEach(r => map[r.key] = r.value);
+  _settingsCache = map; _settingsAt = Date.now();
   return map;
 }
 
