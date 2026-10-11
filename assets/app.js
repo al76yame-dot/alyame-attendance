@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.10.10.1';
+const APP_VERSION = '2026.10.11.1';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -299,9 +299,11 @@ async function checkIn(loc){
     employee_id: state.user.id,
     check_in: new Date().toISOString(),
     lat_in: loc?.lat, lng_in: loc?.lng,
-    location_in: loc?.name || null,
+    location_in: loc?.name || (state.noGpsFlag ? 'بدون موقع — تعذّر تحديد GPS' : null),
+    note: state.noGpsFlag ? 'سجّل الحضور بدون موقع GPS' : null,
     status: 'ongoing'
   };
+  state.noGpsFlag = false;
   const r = await sb('att_logs', { method:'POST', body });
   state.currentLog = r[0];
   notifyAdminsOfCheck('in', loc).catch(()=>null);
@@ -415,27 +417,29 @@ async function initDashboard(){
   const verEl = document.getElementById('verify-status');
   locEl.textContent = t('loc.pending');
   await loadCurrentLog();
-  const pos = await getLocation();
-  let map = null, marker = null;
   const mapEl = document.getElementById('map');
   const mapVisible = mapEl && state.user.is_admin;
-  if (pos) {
-    state.location = pos;
-    const name = await reverse(pos.lat, pos.lng) || `${pos.lat.toFixed(3)}, ${pos.lng.toFixed(3)}`;
-    state.location.name = name;
-    locEl.textContent = name;
-    verEl.innerHTML = `<span class="text-tertiary font-semibold">${t('verify.ok')}</span>`;
-    if (mapVisible) {
-      map = createMap('map', [pos.lat, pos.lng], 15);
-      marker = L.marker([pos.lat, pos.lng], { icon: pinIcon('#00355f', initials(state.user.name)) }).addTo(map);
-      L.circle([pos.lat, pos.lng], { radius: pos.accuracy||50, color:'#0f4c81', fillColor:'#8ebdf9', fillOpacity:0.15, weight:1 }).addTo(map);
+  // Location runs in the background so the dashboard renders immediately.
+  (async () => {
+    const pos = await getLocation();
+    if (pos) {
+      state.location = pos;
+      const name = await reverse(pos.lat, pos.lng) || `${pos.lat.toFixed(3)}, ${pos.lng.toFixed(3)}`;
+      state.location.name = name;
+      locEl.textContent = name;
+      verEl.innerHTML = `<span class="text-tertiary font-semibold">${t('verify.ok')}</span>`;
+      if (mapVisible) {
+        const map = createMap('map', [pos.lat, pos.lng], 15);
+        L.marker([pos.lat, pos.lng], { icon: pinIcon('#00355f', initials(state.user.name)) }).addTo(map);
+        L.circle([pos.lat, pos.lng], { radius: pos.accuracy||50, color:'#0f4c81', fillColor:'#8ebdf9', fillOpacity:0.15, weight:1 }).addTo(map);
+      }
+    } else {
+      const msg = geoErrorText();
+      locEl.textContent = msg;
+      verEl.innerHTML = `<span class="text-error font-semibold">${msg}</span> <button onclick="App.retryLocation()" class="text-primary underline text-xs ms-1">إعادة المحاولة</button>`;
+      if (mapVisible) mapEl.innerHTML = `<div class="w-full h-full flex items-center justify-center text-outline text-sm p-3 text-center">${msg}</div>`;
     }
-  } else {
-    const msg = geoErrorText();
-    locEl.textContent = msg;
-    verEl.innerHTML = `<span class="text-error font-semibold">${msg}</span> <button onclick="App.retryLocation()" class="text-primary underline text-xs ms-1">إعادة المحاولة</button>`;
-    if (mapVisible) mapEl.innerHTML = `<div class="w-full h-full flex items-center justify-center text-outline text-sm p-3 text-center">${msg}</div>`;
-  }
+  })();
 
   // Clock button
   document.getElementById('btn-clock').onclick = async () => {
@@ -525,7 +529,12 @@ function branchesFromSettings(s){
 async function checkGeofence(loc){
   const s = await loadSettings();
   if (s.geofence_enforce !== 'true') return true;
-  if (!loc || !loc.lat) { alert('لا يمكن تسجيل الحضور بدون موقع GPS'); return false; }
+  if (!loc || !loc.lat) {
+    // Don't block work when GPS fails — record it and let the admin review.
+    const ok = confirm('تعذّر تحديد موقعك.\n\nهل تريد تسجيل الحضور بدون موقع؟\nسيُسجَّل ذلك للمراجعة من الإدارة.');
+    if (ok) state.noGpsFlag = true;
+    return ok;
+  }
   const branches = branchesFromSettings(s).filter(b => !isNaN(b.lat) && !isNaN(b.lng));
   for (const b of branches){
     const d = distMeters(loc.lat, loc.lng, b.lat, b.lng);
