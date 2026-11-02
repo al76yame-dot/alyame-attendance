@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.11.02.1';
+const APP_VERSION = '2026.11.02.2';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -343,17 +343,19 @@ async function notifyAdminsOfCheck(kind, loc, durMin){
     const where = loc?.name ? `📍 ${loc.name}` : '📍 موقع غير محدد';
     const role = state.user.role ? `[${t('role.'+state.user.role)}] ` : '';
     const branch = state.user.branch ? ` · ${state.user.branch}` : '';
-    let title, body;
+    let title, body, tgBody;
     if (kind === 'in'){
       title = `🟢 حضور: ${state.user.name}`;
       body = `${role}${time}${branch}\n${where}`;
+      tgBody = `${role}${time}${branch}`;
     } else {
       const h = Math.floor((durMin||0)/60), m = (durMin||0)%60;
       title = `🔴 انصراف: ${state.user.name}`;
       body = `${role}${time}${branch}\n⏱️ ${h}س ${String(m).padStart(2,'0')}د\n${where}`;
+      tgBody = `${role}${time}${branch}\n⏱️ ${h}س ${String(m).padStart(2,'0')}د`;
     }
     await sendBroadcastPush(title, body, adminIds);
-    tgNotify(`<b>${title}</b>\n${body}`);
+    tgNotify(`<b>${title}</b>\n${tgBody}`);
   } catch(_){}
 }
 
