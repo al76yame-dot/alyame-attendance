@@ -64,6 +64,19 @@ async function purgeOldAlertFlags(){
   return stale.length;
 }
 
+const TG_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN") || "";
+const TG_CHAT = Deno.env.get("TELEGRAM_CHAT_ID") || "";
+async function tgSend(text: string){
+  if (!TG_TOKEN || !TG_CHAT) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: TG_CHAT, text, parse_mode: "HTML", disable_web_page_preview: true }),
+    });
+  } catch(_){}
+}
+
 async function sendPushToEmployees(employeeIds: string[]|null, title: string, body: string, tag: string){
   let q = supa.from("att_push_subs").select("id,endpoint,p256dh,auth,employee_id");
   if (employeeIds) q = q.in("employee_id", employeeIds);
@@ -220,6 +233,9 @@ async function processBranch(branchKey: string, s: Record<string,string>){
     if (auto > 0){
       const targets = open.map((l: any) => l.employee_id);
       await sendPushToEmployees(targets, "✅ انصراف تلقائي", `تم تسجيل انصرافك تلقائياً بعد 30 دقيقة من نهاية الدوام (${end}).`, `auto-out-${branchKey}-${date}`);
+      const { data: autoEmps } = await supa.from("att_employees").select("name").in("id", targets);
+      const names = (autoEmps||[]).map((e: any) => "• " + e.name).join("\n");
+      await tgSend(`<b>✅ انصراف تلقائي — ${branchKey === "tripoli" ? "طرابلس" : "القاهرة"}</b>\nلم يسجّلوا الانصراف بعد ${end} بـ30 دقيقة:\n${names}`);
 
       // Forgetfulness streak: notify admins if employee has 3+ auto-outs in last 7 days
       const sevenDaysAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString();
@@ -294,6 +310,7 @@ async function dailyNotifDigest(s: Record<string,string>){
       `لم يفعّلوا الإشعارات بعد:\n${names}`,
       `digest-${date}`
     );
+    await tgSend(`<b>🔕 ${missing.length} موظف بدون إشعارات</b>\n${names}`);
   }
   await setSetting(flag, "1");
   return { missing: missing.length, sent };

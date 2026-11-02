@@ -1,7 +1,7 @@
 // Alyame Travel & Tourism — Attendance System
 // Backend: Supabase | Maps: Leaflet + OSM
 (function(){
-const APP_VERSION = '2026.10.11.2';
+const APP_VERSION = '2026.11.02.1';
 const SB_URL = 'https://nzuffplbcgzkhqbjenik.supabase.co';
 const SB_KEY = 'sb_publishable_U81gIoQfLsWz45QNjf8PZg_TL0EDbeF';
 const LS_USER='alyame_sess', LS_LANG='alyame_lang', LS_VER='alyame_ver';
@@ -353,6 +353,7 @@ async function notifyAdminsOfCheck(kind, loc, durMin){
       body = `${role}${time}${branch}\n⏱️ ${h}س ${String(m).padStart(2,'0')}د\n${where}`;
     }
     await sendBroadcastPush(title, body, adminIds);
+    tgNotify(`<b>${title}</b>\n${body}`);
   } catch(_){}
 }
 
@@ -716,6 +717,16 @@ async function subscribeToPush(force){
   } catch(e){ console.warn('push subscribe failed', e); return false; }
 }
 
+async function tgNotify(text){
+  try {
+    await fetch(`${SB_URL}/functions/v1/tg-notify`, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+SB_KEY, 'apikey':SB_KEY },
+      body: JSON.stringify({ text })
+    });
+  } catch(_){}
+}
+
 async function sendBroadcastPush(title, body, employee_ids){
   // Calls the Edge Function send-push
   const url = `${SB_URL}/functions/v1/send-push`;
@@ -970,6 +981,8 @@ function wireRequestModal(){
             adminIds
           );
         }
+        const typeAr2 = type==='leave' ? 'إجازة' : 'إذن';
+        tgNotify(`<b>📨 طلب ${typeAr2} جديد</b>\n${state.user.name}\n📅 ${body.start_date}${body.end_date?' إلى '+body.end_date:''}${body.reason?'\n📝 '+body.reason:''}`);
       } catch(_){}
     } catch(err){ toast('فشل الإرسال: '+err.message,'error'); }
   };
@@ -1137,6 +1150,8 @@ async function decideRequest(id, status){
         `${req.start_date}${req.end_date?' إلى '+req.end_date:''}${noteText}`,
         [req.employee_id]
       );
+      const who = req.att_employees?.name || '';
+      tgNotify(`<b>${statAr} طلب ${typeAr}</b>\n${who}\n📅 ${req.start_date}${req.end_date?' إلى '+req.end_date:''}${noteText}`);
     }
   } catch(_){}
   await loadAdminRequests(window._reqFilter||'pending');
@@ -1240,6 +1255,19 @@ async function saveSettings(){
     });
     toast('تم الحفظ','success');
   } catch(e){ toast('فشل: '+e.message,'error'); }
+}
+
+async function testTelegram(){
+  try {
+    const r = await fetch(`${SB_URL}/functions/v1/tg-notify`, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+SB_KEY, 'apikey':SB_KEY },
+      body: JSON.stringify({ text: '<b>✅ اختبار نظام الحضور</b>\nالربط مع تيليجرام يعمل بنجاح.' })
+    });
+    const j = await r.json();
+    if (j.ok) alert('تم الإرسال للقروب بنجاح');
+    else alert('فشل: ' + (j.error || JSON.stringify(j.result?.description || j)));
+  } catch(e){ alert('فشل: '+e.message); }
 }
 
 async function sendTestPushToMe(){
@@ -2135,5 +2163,5 @@ function wireCommon(){
   });
 }
 
-window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, sendPushNow, sendTestPushToMe, resetTodayAlerts, enableNotifications, showNotifGuide, testMyNotification, loadReport, exportReport, exportReportPDF, exportDetailedPDF, sendMonthlyEmail, retryLocation, state };
+window.App = { initLogin, initDashboard, initHistory, initAdmin, showDetails, editLog, deleteLog, decideRequest, saveSettings, useMyLocation, sendPushNow, sendTestPushToMe, resetTodayAlerts, enableNotifications, showNotifGuide, testMyNotification, loadReport, exportReport, exportReportPDF, exportDetailedPDF, sendMonthlyEmail, retryLocation, testTelegram, state };
 })();
